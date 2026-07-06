@@ -48,7 +48,7 @@ export function NotebookList({
       </div>
 
       {error && (
-        <p className="border-[1.5px] border-ink bg-signal px-3 py-2 text-sm">
+        <p className="border-[1.5px] border-ink bg-paper px-3 py-2 text-sm">
           {error}
         </p>
       )}
