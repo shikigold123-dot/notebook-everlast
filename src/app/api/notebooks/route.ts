@@ -32,6 +32,13 @@ export async function POST(request: Request) {
       ? body.title.trim()
       : "Unbenanntes Dossier";
 
+  if (title.length > 200) {
+    return NextResponse.json(
+      { error: "Titel darf höchstens 200 Zeichen lang sein." },
+      { status: 400 }
+    );
+  }
+
   try {
     const created = await createNotebook(getDb(), visitorId, title);
     return NextResponse.json({ notebook: created }, { status: 201 });

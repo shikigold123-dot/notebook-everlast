@@ -66,6 +66,18 @@ describe("POST /api/notebooks", () => {
     const res = await POST(postRequest({ title: "X" }));
     expect(res.status).toBe(401);
   });
+
+  it("liefert 400 bei einem Titel über 200 Zeichen", async () => {
+    const res = await POST(postRequest({ title: "a".repeat(201) }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Titel darf höchstens 200 Zeichen lang sein.");
+  });
+
+  it("akzeptiert einen Titel mit genau 200 Zeichen", async () => {
+    const res = await POST(postRequest({ title: "a".repeat(200) }));
+    expect(res.status).toBe(201);
+  });
 });
 
 describe("GET /api/notebooks", () => {
