@@ -8,6 +8,7 @@ import {
   jsonb,
   timestamp,
   primaryKey,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const sourceType = pgEnum("source_type", [
@@ -46,19 +47,29 @@ export const audioStatus = pgEnum("audio_status", [
 
 export const visitor = pgTable("visitor", {
   id: uuid("id").primaryKey().defaultRandom(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
-export const notebook = pgTable("notebook", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  visitorId: uuid("visitor_id")
-    .notNull()
-    .references(() => visitor.id),
-  title: text("title").notNull(),
-  isDemo: boolean("is_demo").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const notebook = pgTable(
+  "notebook",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    visitorId: uuid("visitor_id")
+      .notNull()
+      .references(() => visitor.id),
+    title: text("title").notNull(),
+    isDemo: boolean("is_demo").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("notebook_visitor_id_idx").on(t.visitorId)]
+);
 
 export const source = pgTable("source", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -74,7 +85,9 @@ export const source = pgTable("source", {
   content: text("content"),
   tokenCount: integer("token_count"),
   meta: jsonb("meta"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const chatMessage = pgTable("chat_message", {
@@ -85,7 +98,9 @@ export const chatMessage = pgTable("chat_message", {
   role: chatRole("role").notNull(),
   content: text("content").notNull(),
   citations: jsonb("citations"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const artifact = pgTable("artifact", {
@@ -96,7 +111,9 @@ export const artifact = pgTable("artifact", {
   type: artifactType("type").notNull(),
   status: artifactStatus("status").notNull().default("pending"),
   content: jsonb("content"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const audioOverview = pgTable("audio_overview", {
@@ -108,7 +125,9 @@ export const audioOverview = pgTable("audio_overview", {
   script: jsonb("script"),
   audioBlobUrl: text("audio_blob_url"),
   durationS: integer("duration_s"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const usageCounter = pgTable(

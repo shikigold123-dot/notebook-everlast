@@ -11,7 +11,7 @@ export async function listNotebooks(db: Db, visitorId: string) {
     .select()
     .from(notebook)
     .where(eq(notebook.visitorId, visitorId))
-    .orderBy(asc(notebook.createdAt));
+    .orderBy(asc(notebook.createdAt), asc(notebook.id));
 }
 
 export async function createNotebook(

@@ -10,7 +10,7 @@ CREATE TABLE "artifact" (
 	"type" "artifact_type" NOT NULL,
 	"status" "artifact_status" DEFAULT 'pending' NOT NULL,
 	"content" jsonb,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "audio_overview" (
@@ -20,7 +20,7 @@ CREATE TABLE "audio_overview" (
 	"script" jsonb,
 	"audio_blob_url" text,
 	"duration_s" integer,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "chat_message" (
@@ -29,7 +29,7 @@ CREATE TABLE "chat_message" (
 	"role" "chat_role" NOT NULL,
 	"content" text NOT NULL,
 	"citations" jsonb,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "notebook" (
@@ -37,8 +37,8 @@ CREATE TABLE "notebook" (
 	"visitor_id" uuid NOT NULL,
 	"title" text NOT NULL,
 	"is_demo" boolean DEFAULT false NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "source" (
@@ -53,7 +53,7 @@ CREATE TABLE "source" (
 	"content" text,
 	"token_count" integer,
 	"meta" jsonb,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "usage_counter" (
@@ -65,11 +65,12 @@ CREATE TABLE "usage_counter" (
 --> statement-breakpoint
 CREATE TABLE "visitor" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 ALTER TABLE "artifact" ADD CONSTRAINT "artifact_notebook_id_notebook_id_fk" FOREIGN KEY ("notebook_id") REFERENCES "public"."notebook"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audio_overview" ADD CONSTRAINT "audio_overview_notebook_id_notebook_id_fk" FOREIGN KEY ("notebook_id") REFERENCES "public"."notebook"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chat_message" ADD CONSTRAINT "chat_message_notebook_id_notebook_id_fk" FOREIGN KEY ("notebook_id") REFERENCES "public"."notebook"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notebook" ADD CONSTRAINT "notebook_visitor_id_visitor_id_fk" FOREIGN KEY ("visitor_id") REFERENCES "public"."visitor"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "source" ADD CONSTRAINT "source_notebook_id_notebook_id_fk" FOREIGN KEY ("notebook_id") REFERENCES "public"."notebook"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "source" ADD CONSTRAINT "source_notebook_id_notebook_id_fk" FOREIGN KEY ("notebook_id") REFERENCES "public"."notebook"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "notebook_visitor_id_idx" ON "notebook" USING btree ("visitor_id");
