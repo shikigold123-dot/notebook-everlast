@@ -12,6 +12,8 @@ chatten (mit klickbaren Zitaten), Artefakte generieren, KI-Podcast erzeugen.
 4. Für Quellen-Ingestion zusätzlich in `.env.local` eintragen:
    - `ANTHROPIC_API_KEY` oder `OPENROUTER_API_KEY` (Tokenzählung; Anthropic exakt,
      OpenRouter lokal geschätzt)
+   - `OPENROUTER_MODEL` (optional; Standard: `google/gemini-2.5-flash`, auch
+     für den Chat)
    - `OPENAI_API_KEY` (OpenAI — nur für Audio-Transkription)
    - `BLOB_READ_WRITE_TOKEN` (Vercel Blob — im Vercel-Dashboard einen Blob-Store
      anlegen und den Token kopieren)

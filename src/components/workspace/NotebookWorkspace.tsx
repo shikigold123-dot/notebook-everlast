@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { SourcesPanel, type SourceListItem } from "./SourcesPanel";
+import { ChatPanel, type ChatMessageItem } from "./ChatPanel";
 
 export type WorkspaceNotebook = {
   id: string;
@@ -12,10 +13,14 @@ export type WorkspaceNotebook = {
 export function NotebookWorkspace({
   notebook,
   sources,
+  chatMessages,
 }: {
   notebook: WorkspaceNotebook;
   sources: SourceListItem[];
+  chatMessages: ChatMessageItem[];
 }) {
+  const readySourceCount = sources.filter((source) => source.status === "ready").length;
+
   return (
     <div className="flex h-dvh flex-col">
       <header className="flex items-baseline justify-between border-b-2 border-ink bg-paper px-4 py-2">
@@ -33,17 +38,11 @@ export function NotebookWorkspace({
         </Panel>
 
         <Panel label="Chat">
-          <div className="flex h-full flex-col justify-end gap-3">
-            <p className="text-sm text-ink/60">
-              Chat ist noch nicht aktiv. Phase 3 verbindet bereite Quellen mit
-              Antworten und klickbaren Zitaten.
-            </p>
-            <input
-              disabled
-              placeholder="Chat wird in Phase 3 aktiviert"
-              className="border-[1.5px] border-ink bg-paper px-3 py-2 text-sm disabled:opacity-40"
-            />
-          </div>
+          <ChatPanel
+            notebookId={notebook.id}
+            initialMessages={chatMessages}
+            readySourceCount={readySourceCount}
+          />
         </Panel>
 
         <Panel label="Studio">

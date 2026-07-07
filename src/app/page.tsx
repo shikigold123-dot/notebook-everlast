@@ -38,6 +38,7 @@ function MissingDatabaseSetup() {
         <pre className="overflow-x-auto border-[1.5px] border-ink bg-ground p-3 text-xs">
 {`DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
 OPENROUTER_API_KEY=...
+OPENROUTER_MODEL=google/gemini-2.5-flash
 BLOB_READ_WRITE_TOKEN=...
 OPENAI_API_KEY=...`}
         </pre>

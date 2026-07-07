@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { readVisitorId, UUID_RE } from "@/lib/visitor";
 import { getNotebook, listNotebooks } from "@/db/repo/notebooks";
+import { listChatMessages, type ChatCitation } from "@/db/repo/chat";
 import { listSources } from "@/db/repo/sources";
 import { NotebookWorkspace } from "@/components/workspace/NotebookWorkspace";
 
@@ -26,6 +27,7 @@ export default async function NotebookPage({
   const position = all.findIndex((n) => n.id === nb.id) + 1;
 
   const sources = await listSources(db, nb.id);
+  const chatMessages = await listChatMessages(db, nb.id);
 
   return (
     <NotebookWorkspace
@@ -40,6 +42,12 @@ export default async function NotebookPage({
         status: s.status,
         title: s.title,
         errorMessage: s.errorMessage,
+      }))}
+      chatMessages={chatMessages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        citations: (message.citations as ChatCitation[] | null) ?? null,
       }))}
     />
   );
