@@ -23,19 +23,24 @@ export function NotebookList({
   async function handleCreate() {
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/notebooks", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      setError(json.error ?? "Das hat nicht geklappt — bitte nochmal versuchen.");
-      return;
+    try {
+      const res = await fetch("/api/notebooks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setError(json.error ?? "Das hat nicht geklappt — bitte nochmal versuchen.");
+        return;
+      }
+      const { notebook } = await res.json();
+      router.push(`/notebook/${notebook.id}`);
+    } catch {
+      setError("Keine Verbindung — bitte nochmal versuchen.");
+    } finally {
+      setBusy(false);
     }
-    const { notebook } = await res.json();
-    router.push(`/notebook/${notebook.id}`);
   }
 
   return (
