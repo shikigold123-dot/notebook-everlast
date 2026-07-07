@@ -44,6 +44,8 @@ beforeEach(async () => {
   notebookId = nb.id;
   cookieValue = VISITOR;
   generateChatAnswerMock.mockReset().mockResolvedValue("Antwort [S-01]");
+  delete process.env.LIMIT_CHAT_PER_VISITOR_DAY;
+  delete process.env.DAILY_BUDGET_CENTS;
 });
 
 function ctx(id = notebookId) {
@@ -134,5 +136,22 @@ describe("POST /api/notebooks/[id]/chat", () => {
     expect(res.status).toBe(502);
     const json = await res.json();
     expect(json.error).toBe("Kaputt");
+  });
+
+  it("liefert 429 ab dem Chat-Tageslimit", async () => {
+    process.env.LIMIT_CHAT_PER_VISITOR_DAY = "1";
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    await POST(postRequest({ question: "Eins?" }), ctx());
+    const res = await POST(postRequest({ question: "Zwei?" }), ctx());
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toContain("Tageslimit erreicht");
   });
 });

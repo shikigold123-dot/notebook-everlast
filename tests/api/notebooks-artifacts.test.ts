@@ -48,6 +48,8 @@ beforeEach(async () => {
   generateArtifactContentMock.mockReset().mockResolvedValue({
     items: [{ question: "Q", answer: "A" }],
   });
+  delete process.env.LIMIT_ARTIFACTS_PER_VISITOR_DAY;
+  delete process.env.DAILY_BUDGET_CENTS;
 });
 
 function ctx(id = notebookId) {
@@ -149,6 +151,23 @@ describe("POST /api/notebooks/[id]/artifacts", () => {
     expect(res.status).toBe(502);
     const json = await res.json();
     expect(json.error).toBe("Kaputt");
+  });
+
+  it("liefert 429 ab dem Artefakt-Tageslimit", async () => {
+    process.env.LIMIT_ARTIFACTS_PER_VISITOR_DAY = "1";
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    await POST(postRequest({ type: "faq" }), ctx());
+    const res = await POST(postRequest({ type: "briefing" }), ctx());
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toContain("Tageslimit erreicht");
   });
 });
 

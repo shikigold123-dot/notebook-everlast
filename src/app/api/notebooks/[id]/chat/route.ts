@@ -6,6 +6,10 @@ import { createChatMessage, listChatMessages } from "@/db/repo/chat";
 import { listSources } from "@/db/repo/sources";
 import { readVisitorId } from "@/lib/visitor";
 import {
+  consumeDailyUsage,
+  UsageLimitExceededError,
+} from "@/lib/usage/guard";
+import {
   ChatGenerationError,
   extractCitations,
   generateChatAnswer,
@@ -71,6 +75,7 @@ export async function POST(
   }));
 
   try {
+    await consumeDailyUsage(db, visitorId, "chat");
     const answer = await generateChatAnswer({
       sources,
       history,
@@ -97,6 +102,9 @@ export async function POST(
       assistantMessage,
     });
   } catch (err) {
+    if (err instanceof UsageLimitExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof ChatGenerationError) {
       return NextResponse.json({ error: err.message }, { status: 502 });
     }

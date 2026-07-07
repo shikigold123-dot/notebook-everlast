@@ -10,6 +10,10 @@ import { getNotebook } from "@/db/repo/notebooks";
 import { listSources } from "@/db/repo/sources";
 import { readVisitorId } from "@/lib/visitor";
 import {
+  consumeDailyUsage,
+  UsageLimitExceededError,
+} from "@/lib/usage/guard";
+import {
   ArtifactGenerationError,
   generateArtifactContent,
 } from "@/lib/artifacts/openrouter";
@@ -113,6 +117,7 @@ export async function POST(
   }
 
   try {
+    await consumeDailyUsage(db, visitorId, "artifact");
     const content = await generateArtifactContent({
       type: body.type,
       sources,
@@ -121,6 +126,9 @@ export async function POST(
 
     return NextResponse.json({ artifact }, { status: 201 });
   } catch (err) {
+    if (err instanceof UsageLimitExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof ArtifactGenerationError) {
       return NextResponse.json({ error: err.message }, { status: 502 });
     }

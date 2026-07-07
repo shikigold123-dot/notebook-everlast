@@ -47,6 +47,9 @@ beforeEach(async () => {
     { speaker: "A", text: "Frage" },
     { speaker: "B", text: "Antwort" },
   ]);
+  delete process.env.LIMIT_AUDIO_PER_VISITOR_DAY;
+  delete process.env.LIMIT_AUDIO_GLOBAL_DAY;
+  delete process.env.DAILY_BUDGET_CENTS;
 });
 
 function ctx(id = notebookId) {
@@ -151,6 +154,33 @@ describe("POST /api/notebooks/[id]/audio", () => {
     const json = await res.json();
     expect(json.error).toBe("Kaputt");
     expect(json.audioOverview.status).toBe("error");
+  });
+
+  it("liefert 429 ab dem Audio-Tageslimit", async () => {
+    process.env.LIMIT_AUDIO_PER_VISITOR_DAY = "1";
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    await POST(new Request("http://localhost"), ctx());
+
+    const other = await createNotebook(testDb, VISITOR, "Audio zwei");
+    await createSource(testDb, other.id, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+    const res = await POST(new Request("http://localhost"), {
+      params: Promise.resolve({ id: other.id }),
+    });
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toContain("Tageslimit erreicht");
   });
 });
 

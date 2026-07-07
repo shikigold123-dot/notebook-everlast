@@ -11,6 +11,10 @@ import { getNotebook } from "@/db/repo/notebooks";
 import { listSources } from "@/db/repo/sources";
 import { readVisitorId } from "@/lib/visitor";
 import {
+  consumeDailyUsage,
+  UsageLimitExceededError,
+} from "@/lib/usage/guard";
+import {
   AudioGenerationError,
   generateAudioScript,
 } from "@/lib/audio/openrouter";
@@ -96,6 +100,15 @@ export async function POST(
       { error: "Füge zuerst eine bereite Quelle hinzu." },
       { status: 400 }
     );
+  }
+
+  try {
+    await consumeDailyUsage(db, visitorId, "audio");
+  } catch (err) {
+    if (err instanceof UsageLimitExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    throw err;
   }
 
   const created = await createQueuedAudioOverview(db, notebookId);

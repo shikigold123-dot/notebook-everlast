@@ -21,4 +21,13 @@ export const LIMITS = {
   get artifactsPerVisitorDay() {
     return intFromEnv("LIMIT_ARTIFACTS_PER_VISITOR_DAY", 10);
   },
+  get audioPerVisitorDay() {
+    return intFromEnv("LIMIT_AUDIO_PER_VISITOR_DAY", 2);
+  },
+  get audioGlobalDay() {
+    return intFromEnv("LIMIT_AUDIO_GLOBAL_DAY", 10);
+  },
+  get dailyBudgetCents() {
+    return intFromEnv("DAILY_BUDGET_CENTS", 0);
+  },
 };
