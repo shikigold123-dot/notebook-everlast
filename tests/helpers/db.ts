@@ -1,10 +1,21 @@
+import { afterEach } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import * as schema from "@/db/schema";
 
+const clients: PGlite[] = [];
+
+afterEach(async () => {
+  const openClients = clients.splice(0);
+  await Promise.all(
+    openClients.map((client) => client.close().catch(() => undefined)),
+  );
+});
+
 export async function createTestDb() {
   const client = new PGlite();
+  clients.push(client);
   const db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: "./drizzle" });
   return db;
