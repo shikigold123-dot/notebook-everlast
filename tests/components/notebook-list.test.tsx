@@ -33,6 +33,24 @@ describe("NotebookList", () => {
     ).toBeInTheDocument();
   });
 
+  it("markiert Demo-Dossiers", () => {
+    render(
+      <NotebookList
+        notebooks={[
+          {
+            id: "demo",
+            title: "Everlast Demo",
+            isDemo: true,
+            createdAt: "2026-07-01T10:00:00Z",
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText("DEMO-DOSSIER")).toBeInTheDocument();
+    expect(screen.getByText("Lesen")).toBeInTheDocument();
+  });
+
   it("zeigt den Leer-Zustand ohne Notebooks", () => {
     render(<NotebookList notebooks={[]} />);
     expect(screen.getByText(/noch keine dossiers/i)).toBeInTheDocument();

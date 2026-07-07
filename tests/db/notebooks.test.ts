@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "../helpers/db";
 import {
   listNotebooks,
+  listVisibleNotebooks,
   createNotebook,
   getNotebook,
   LimitExceededError,
@@ -51,6 +52,21 @@ describe("listNotebooks", () => {
 
     const rows = await listNotebooks(db, VISITOR_A);
     expect(rows.map((n) => n.title)).toEqual(["Erstes", "Zweites"]);
+  });
+});
+
+describe("listVisibleNotebooks", () => {
+  it("liefert eigene Notebooks plus Demo-Dossiers, Demo zuerst", async () => {
+    await createNotebook(db, VISITOR_A, "Eigen");
+    await createNotebook(db, VISITOR_B, "Fremd");
+    const demo = await createNotebook(db, VISITOR_B, "Demo");
+    await db
+      .update(notebook)
+      .set({ isDemo: true })
+      .where(eq(notebook.id, demo.id));
+
+    const rows = await listVisibleNotebooks(db, VISITOR_A);
+    expect(rows.map((n) => n.title)).toEqual(["Demo", "Eigen"]);
   });
 });
 

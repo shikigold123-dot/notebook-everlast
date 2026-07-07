@@ -8,6 +8,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 export type NotebookListItem = {
   id: string;
   title: string;
+  isDemo?: boolean;
   createdAt: string;
 };
 
@@ -72,10 +73,17 @@ export function NotebookList({
                 className="block border-[1.5px] border-ink bg-paper p-4 transition-colors hover:bg-signal"
               >
                 <span className="label-caps block text-ink/60">
-                  {`DOSSIER ${String(i + 1).padStart(3, "0")}`}
+                  {nb.isDemo
+                    ? "DEMO-DOSSIER"
+                    : `DOSSIER ${String(i + 1).padStart(3, "0")}`}
                 </span>
-                <span className="mt-2 block text-lg font-medium">
-                  {nb.title}
+                <span className="mt-2 flex items-start justify-between gap-2 text-lg font-medium">
+                  <span>{nb.title}</span>
+                  {nb.isDemo && (
+                    <span className="label-caps border-[1.5px] border-ink px-1 text-xs">
+                      Lesen
+                    </span>
+                  )}
                 </span>
               </Link>
             </li>

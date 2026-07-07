@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { readVisitorId } from "@/lib/visitor";
 import {
   createNotebook,
-  listNotebooks,
+  listVisibleNotebooks,
   LimitExceededError,
 } from "@/db/repo/notebooks";
 
@@ -13,7 +13,7 @@ export async function GET() {
   if (!visitorId) {
     return NextResponse.json({ notebooks: [] });
   }
-  const notebooks = await listNotebooks(getDb(), visitorId);
+  const notebooks = await listVisibleNotebooks(getDb(), visitorId);
   return NextResponse.json({ notebooks });
 }
 

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getDb } from "@/db";
 import { readVisitorId } from "@/lib/visitor";
-import { listNotebooks } from "@/db/repo/notebooks";
+import { listVisibleNotebooks } from "@/db/repo/notebooks";
 import { NotebookList } from "@/components/dashboard/NotebookList";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
 
   const visitorId = readVisitorId(await cookies());
   const notebooks = visitorId
-    ? await listNotebooks(getDb(), visitorId)
+    ? await listVisibleNotebooks(getDb(), visitorId)
     : [];
 
   return (
@@ -63,6 +63,7 @@ export default async function DashboardPage() {
         notebooks={notebooks.map((nb) => ({
           id: nb.id,
           title: nb.title,
+          isDemo: nb.isDemo,
           createdAt: nb.createdAt.toISOString(),
         }))}
       />

@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb } from "../helpers/db";
 import type { Db } from "@/db";
+import { createNotebook } from "@/db/repo/notebooks";
+import { notebook } from "@/db/schema";
 
 // DB-Modul mocken: Die Route bekommt unsere PGlite-Instanz
 let testDb: Db;
@@ -87,6 +90,27 @@ describe("GET /api/notebooks", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.notebooks).toHaveLength(1);
+  });
+
+  it("listet zusätzlich Demo-Dossiers", async () => {
+    await POST(postRequest({ title: "Kant" }));
+    const demo = await createNotebook(
+      testDb,
+      "bbbbbbbb-0000-4000-8000-000000000002",
+      "Demo"
+    );
+    await testDb
+      .update(notebook)
+      .set({ isDemo: true })
+      .where(eq(notebook.id, demo.id));
+
+    const res = await GET();
+    const json = await res.json();
+
+    expect(json.notebooks.map((nb: { title: string }) => nb.title)).toEqual([
+      "Demo",
+      "Kant",
+    ]);
   });
 
   it("liefert eine leere Liste ohne Cookie", async () => {

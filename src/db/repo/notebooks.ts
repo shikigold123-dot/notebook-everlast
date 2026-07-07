@@ -1,4 +1,4 @@
-import { and, asc, count, eq, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, or } from "drizzle-orm";
 import { notebook } from "@/db/schema";
 import type { Db } from "@/db";
 import { ensureVisitor } from "@/lib/visitor";
@@ -12,6 +12,14 @@ export async function listNotebooks(db: Db, visitorId: string) {
     .from(notebook)
     .where(eq(notebook.visitorId, visitorId))
     .orderBy(asc(notebook.createdAt), asc(notebook.id));
+}
+
+export async function listVisibleNotebooks(db: Db, visitorId: string) {
+  return db
+    .select()
+    .from(notebook)
+    .where(or(eq(notebook.visitorId, visitorId), eq(notebook.isDemo, true)))
+    .orderBy(desc(notebook.isDemo), asc(notebook.createdAt), asc(notebook.id));
 }
 
 export async function createNotebook(
