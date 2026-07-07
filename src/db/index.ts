@@ -13,7 +13,12 @@ let _db: Db | null = null;
 
 export function getDb(): Db {
   if (!_db) {
-    const sql = neon(process.env.DATABASE_URL!);
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        "DATABASE_URL fehlt — bitte in .env.local eintragen (siehe README, Abschnitt Setup)."
+      );
+    }
+    const sql = neon(process.env.DATABASE_URL);
     _db = drizzle(sql, { schema }) as unknown as Db;
   }
   return _db;
