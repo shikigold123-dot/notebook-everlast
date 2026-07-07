@@ -23,9 +23,8 @@ describe("NotebookWorkspace", () => {
   it("zeigt die Platzhalter-Texte", () => {
     render(<NotebookWorkspace notebook={NB} sources={[]} />);
     expect(screen.getByText(/noch keine quellen/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/füge zuerst quellen hinzu/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/chat ist noch nicht aktiv/i)).toBeInTheDocument();
+    expect(screen.getByText(/study guide \/ phase 4/i)).toBeInTheDocument();
   });
 
   it("zeigt eine übergebene Quelle mit Status", () => {

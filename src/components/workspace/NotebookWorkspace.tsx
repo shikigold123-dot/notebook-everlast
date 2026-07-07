@@ -35,12 +35,12 @@ export function NotebookWorkspace({
         <Panel label="Chat">
           <div className="flex h-full flex-col justify-end gap-3">
             <p className="text-sm text-ink/60">
-              Füge zuerst Quellen hinzu, dann kannst du hier Fragen stellen —
-              mit Zitaten direkt aus deinen Dokumenten.
+              Chat ist noch nicht aktiv. Phase 3 verbindet bereite Quellen mit
+              Antworten und klickbaren Zitaten.
             </p>
             <input
               disabled
-              placeholder="Frag deine Quellen …"
+              placeholder="Chat wird in Phase 3 aktiviert"
               className="border-[1.5px] border-ink bg-paper px-3 py-2 text-sm disabled:opacity-40"
             />
           </div>
@@ -49,12 +49,14 @@ export function NotebookWorkspace({
         <Panel label="Studio">
           <ul className="flex flex-col gap-2 text-sm text-ink/60">
             <li className="border border-dashed border-ink p-2">
-              ▶ Audio Overview
+              Audio Overview / Phase 5
             </li>
             <li className="border border-dashed border-ink p-2">
-              Study Guide
+              Study Guide / Phase 4
             </li>
-            <li className="border border-dashed border-ink p-2">Mind Map</li>
+            <li className="border border-dashed border-ink p-2">
+              Mind Map / Phase 4
+            </li>
           </ul>
         </Panel>
       </div>
