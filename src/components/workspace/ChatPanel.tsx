@@ -43,10 +43,12 @@ export function ChatPanel({
   notebookId,
   initialMessages,
   readySourceCount,
+  onSelectSource,
 }: {
   notebookId: string;
   initialMessages: ChatMessageItem[];
   readySourceCount: number;
+  onSelectSource?: (sourceId: string) => void;
 }) {
   const [messages, setMessages] = useState(initialMessages ?? []);
   const [question, setQuestion] = useState("");
@@ -90,6 +92,11 @@ export function ChatPanel({
 
   const hasReadySources = readySourceCount > 0;
 
+  function handleSelectCitation(citation: ChatCitation) {
+    setSelectedCitation(citation);
+    onSelectSource?.(citation.sourceId);
+  }
+
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -114,7 +121,7 @@ export function ChatPanel({
                     ? renderAssistantText(
                         message.content,
                         message.citations,
-                        setSelectedCitation
+                        handleSelectCitation
                       )
                     : message.content}
                 </p>

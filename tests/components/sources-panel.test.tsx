@@ -48,6 +48,56 @@ describe("SourcesPanel", () => {
     expect(screen.getByText("✓ Bereit")).toBeInTheDocument();
   });
 
+  it("öffnet eine Quelle im Viewer", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        source: {
+          ...READY,
+          content: "Das ist der Quellentext.",
+          tokenCount: 5,
+          originalUrl: "https://example.com/artikel",
+          blobUrl: null,
+          createdAt: "2026-07-08T10:00:00.000Z",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const onSelectSource = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <SourcesPanel
+        notebookId="nb-1"
+        initialSources={[READY]}
+        selectedSourceId="s-1"
+        onSelectSource={onSelectSource}
+      />
+    );
+
+    expect(await screen.findByText("Das ist der Quellentext.")).toBeInTheDocument();
+    expect(screen.getByText(/5 Tokens/i)).toBeInTheDocument();
+
+    await user.click(screen.getByText("Schließen"));
+    expect(onSelectSource).toHaveBeenCalledWith(null);
+  });
+
+  it("meldet eine Quellen-Auswahl an den Workspace", async () => {
+    const onSelectSource = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <SourcesPanel
+        notebookId="nb-1"
+        initialSources={[READY]}
+        onSelectSource={onSelectSource}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Fertig" }));
+    expect(onSelectSource).toHaveBeenCalledWith("s-1");
+  });
+
   it("pollt, solange eine Quelle wartet, und stoppt, sobald alle fertig sind", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

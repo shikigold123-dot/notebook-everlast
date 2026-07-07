@@ -67,10 +67,12 @@ describe("ChatPanel", () => {
 
   it("macht Quellenchips anklickbar", async () => {
     const user = userEvent.setup();
+    const onSelectSource = vi.fn();
     render(
       <ChatPanel
         notebookId="nb-1"
         readySourceCount={1}
+        onSelectSource={onSelectSource}
         initialMessages={[
           {
             id: "m-1",
@@ -84,6 +86,7 @@ describe("ChatPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "[S-01]" }));
     expect(screen.getByText("S-01: Quelle")).toBeInTheDocument();
+    expect(onSelectSource).toHaveBeenCalledWith("s-1");
   });
 
   it("zeigt Serverfehler", async () => {

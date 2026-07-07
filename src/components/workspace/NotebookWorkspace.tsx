@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { SourcesPanel, type SourceListItem } from "./SourcesPanel";
@@ -28,6 +31,7 @@ export function NotebookWorkspace({
   artifacts: ArtifactListItem[];
   audioOverview: AudioOverviewItem | null;
 }) {
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const readySourceCount = sources.filter(
     (source) => source.status === "ready"
   ).length;
@@ -45,7 +49,12 @@ export function NotebookWorkspace({
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 lg:grid-cols-[280px_1fr_280px]">
         <Panel label="Quellen" count={sources.length}>
-          <SourcesPanel notebookId={notebook.id} initialSources={sources} />
+          <SourcesPanel
+            notebookId={notebook.id}
+            initialSources={sources}
+            selectedSourceId={selectedSourceId}
+            onSelectSource={setSelectedSourceId}
+          />
         </Panel>
 
         <Panel label="Chat">
@@ -53,6 +62,7 @@ export function NotebookWorkspace({
             notebookId={notebook.id}
             initialMessages={chatMessages}
             readySourceCount={readySourceCount}
+            onSelectSource={setSelectedSourceId}
           />
         </Panel>
 

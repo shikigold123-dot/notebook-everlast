@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "../helpers/db";
 import type { Db } from "@/db";
 import { createNotebook } from "@/db/repo/notebooks";
-import { createSource, getSource } from "@/db/repo/sources";
+import { createSource, getSource, markReady } from "@/db/repo/sources";
 import { notebook, source } from "@/db/schema";
 
 let testDb: Db;
@@ -32,7 +32,10 @@ vi.mock("@/lib/ingestion/process", () => ({
   processSource: (...args: unknown[]) => processSourceMock(...args),
 }));
 
-import { DELETE } from "@/app/api/notebooks/[id]/sources/[sourceId]/route";
+import {
+  DELETE,
+  GET,
+} from "@/app/api/notebooks/[id]/sources/[sourceId]/route";
 import { POST as retryPOST } from "@/app/api/notebooks/[id]/sources/[sourceId]/retry/route";
 
 const VISITOR = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -92,6 +95,40 @@ describe("DELETE /api/notebooks/[id]/sources/[sourceId]", () => {
     expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
     const remaining = await getSource(testDb, notebookId, sourceId);
     expect(remaining).not.toBeNull();
+  });
+});
+
+describe("GET /api/notebooks/[id]/sources/[sourceId]", () => {
+  it("liefert die Quelle mit Inhalt", async () => {
+    await markReady(testDb, sourceId, {
+      content: "Extrahierter Quellentext",
+      tokenCount: 3,
+      title: "Artikel",
+    });
+
+    const res = await GET(new Request("http://localhost"), ctx());
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.source.title).toBe("Artikel");
+    expect(json.source.content).toBe("Extrahierter Quellentext");
+    expect(json.source.tokenCount).toBe(3);
+  });
+
+  it("liefert 401 ohne Besucher-Cookie", async () => {
+    cookieValue = undefined;
+    const res = await GET(new Request("http://localhost"), ctx());
+    expect(res.status).toBe(401);
+  });
+
+  it("liefert 404 für eine unbekannte Quelle", async () => {
+    const res = await GET(new Request("http://localhost"), {
+      params: Promise.resolve({
+        id: notebookId,
+        sourceId: "00000000-0000-4000-8000-000000000000",
+      }),
+    });
+    expect(res.status).toBe(404);
   });
 });
 

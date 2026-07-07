@@ -12,6 +12,14 @@ export type SourceListItem = {
   errorMessage: string | null;
 };
 
+export type SourceDetailItem = SourceListItem & {
+  content: string | null;
+  tokenCount: number | null;
+  originalUrl: string | null;
+  blobUrl: string | null;
+  createdAt: string;
+};
+
 const TYPE_LABELS: Record<SourceListItem["type"], string> = {
   pdf: "PDF",
   text: "Text",
@@ -30,12 +38,21 @@ const STATUS_LABELS: Record<SourceListItem["status"], string> = {
 export function SourcesPanel({
   notebookId,
   initialSources,
+  selectedSourceId = null,
+  onSelectSource,
 }: {
   notebookId: string;
   initialSources: SourceListItem[];
+  selectedSourceId?: string | null;
+  onSelectSource?: (sourceId: string | null) => void;
 }) {
   const [sources, setSources] = useState(initialSources);
   const [error, setError] = useState<string | null>(null);
+  const [viewerState, setViewerState] = useState<{
+    sourceId: string;
+    source: SourceDetailItem | null;
+    error: string | null;
+  } | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -67,6 +84,42 @@ export function SourcesPanel({
     };
   }, [sources, notebookId]);
 
+  useEffect(() => {
+    if (!selectedSourceId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(`/api/notebooks/${notebookId}/sources/${selectedSourceId}`)
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(json.error ?? "Quelle konnte nicht geladen werden.");
+        }
+        if (!cancelled) {
+          setViewerState({
+            sourceId: selectedSourceId,
+            source: json.source,
+            error: null,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setViewerState({
+            sourceId: selectedSourceId,
+            source: null,
+            error: "Quelle konnte nicht geladen werden.",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [notebookId, selectedSourceId]);
+
   async function handleRetry(sourceId: string) {
     setError(null);
     const res = await fetch(
@@ -91,10 +144,21 @@ export function SourcesPanel({
     );
     if (res.ok) {
       setSources((prev) => prev.filter((s) => s.id !== sourceId));
+      if (selectedSourceId === sourceId) {
+        onSelectSource?.(null);
+      }
     } else {
       setError("Löschen ist fehlgeschlagen — bitte später nochmal probieren.");
     }
   }
+
+  const currentViewer =
+    selectedSourceId && viewerState?.sourceId === selectedSourceId
+      ? viewerState
+      : null;
+  const selectedSource = currentViewer?.source ?? null;
+  const viewerError = currentViewer?.error ?? null;
+  const viewerBusy = Boolean(selectedSourceId && !currentViewer);
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -109,6 +173,61 @@ export function SourcesPanel({
         </p>
       )}
 
+      {selectedSourceId && (
+        <section className="border-[1.5px] border-ink bg-paper p-2 text-sm">
+          <div className="flex items-start justify-between gap-2">
+            <p className="label-caps">Quellen-Viewer</p>
+            <button
+              type="button"
+              onClick={() => onSelectSource?.(null)}
+              className="text-xs underline"
+            >
+              Schließen
+            </button>
+          </div>
+
+          {viewerBusy && (
+            <p className="mt-2 text-xs text-ink/60">Quelle wird geladen ...</p>
+          )}
+
+          {viewerError && (
+            <p className="mt-2 border-[1.5px] border-ink bg-paper px-2 py-1 text-xs">
+              {viewerError}
+            </p>
+          )}
+
+          {selectedSource && (
+            <div className="mt-2 flex flex-col gap-2">
+              <div>
+                <p className="font-bold">{selectedSource.title}</p>
+                <p className="label-caps mt-1 text-ink/60">
+                  {TYPE_LABELS[selectedSource.type]}
+                  {selectedSource.tokenCount
+                    ? ` / ${selectedSource.tokenCount.toLocaleString(
+                        "de-DE"
+                      )} Tokens`
+                    : ""}
+                </p>
+                {selectedSource.originalUrl && (
+                  <a
+                    href={selectedSource.originalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block truncate text-xs underline"
+                  >
+                    {selectedSource.originalUrl}
+                  </a>
+                )}
+              </div>
+              <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap border-t-[1.5px] border-ink pt-2 font-sans text-xs leading-5">
+                {selectedSource.content?.trim() ||
+                  "Für diese Quelle ist noch kein Text verfügbar."}
+              </pre>
+            </div>
+          )}
+        </section>
+      )}
+
       <ul className="flex flex-col gap-2 overflow-y-auto">
         {sources.length === 0 && (
           <li className="text-sm text-ink/60">
@@ -118,10 +237,18 @@ export function SourcesPanel({
         {sources.map((s) => (
           <li
             key={s.id}
-            className="border-[1.5px] border-ink bg-paper p-2 text-sm"
+            className={`border-[1.5px] border-ink p-2 text-sm ${
+              selectedSourceId === s.id ? "bg-signal" : "bg-paper"
+            }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate">{s.title}</span>
+              <button
+                type="button"
+                onClick={() => onSelectSource?.(s.id)}
+                className="truncate text-left underline-offset-2 hover:underline"
+              >
+                {s.title}
+              </button>
               <SectionLabel>{TYPE_LABELS[s.type]}</SectionLabel>
             </div>
             <div className="mt-1 flex items-center justify-between text-xs text-ink/60">
