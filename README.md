@@ -9,7 +9,12 @@ chatten (mit klickbaren Zitaten), Artefakte generieren, KI-Podcast erzeugen.
 2. Neon-Postgres anlegen (https://neon.tech, Free Tier) und `DATABASE_URL`
    in `.env.local` eintragen (Vorlage: `.env.example`)
 3. Migrationen einspielen: `npx drizzle-kit migrate`
-4. `npm run dev` → http://localhost:3000
+4. Für Quellen-Ingestion zusätzlich in `.env.local` eintragen:
+   - `ANTHROPIC_API_KEY` (Claude API — Tokenzählung)
+   - `OPENAI_API_KEY` (OpenAI — nur für Audio-Transkription)
+   - `BLOB_READ_WRITE_TOKEN` (Vercel Blob — im Vercel-Dashboard einen Blob-Store
+     anlegen und den Token kopieren)
+5. `npm run dev` → http://localhost:3000
 
 ## Tests
 

@@ -10,6 +10,12 @@ NotebookLM-Alternative, öffentliches Portfolio-Produkt. Phase-1-Fundament steht
 - Datenzugriff: Repositories nehmen `db: Db` als ersten Parameter (Injection).
   Prod: `getDb()` (Neon-HTTP — KEINE Transaktionen!). Tests: `createTestDb()` (PGlite + echte Migrationen).
 - Autorisierung im Repo-Layer: Queries immer mit `visitorId` absichern (Vorbild: `getNotebook`).
+- Quellen-Ingestion: alle externen SDKs (`unpdf`, `@mozilla/readability`, `linkedom`,
+  `youtubei.js`, `openai`, `@anthropic-ai/sdk`, `@vercel/blob/client`) werden in Tests
+  immer mit `vi.mock` ersetzt — nie echte Netzwerk-/API-Aufrufe. Extraktions-Module
+  werfen ausschließlich `IngestionError` (`src/lib/ingestion/errors.ts`) mit einer
+  fertigen deutschen Meldung; der Orchestrator (`processSource`) normalisiert alle
+  anderen Fehler zu einer generischen Meldung und wirft selbst niemals nach außen.
 - Tests: `npm test` (Vitest, sequenziell, offline). Vor Commits: `npm test && npx tsc --noEmit && npm run lint`.
 
 ## Dokumente
