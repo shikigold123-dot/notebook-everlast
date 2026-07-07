@@ -35,6 +35,7 @@ export function SourcesPanel({
   initialSources: SourceListItem[];
 }) {
   const [sources, setSources] = useState(initialSources);
+  const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export function SourcesPanel({
   }, [sources, notebookId]);
 
   async function handleRetry(sourceId: string) {
+    setError(null);
     const res = await fetch(
       `/api/notebooks/${notebookId}/sources/${sourceId}/retry`,
       { method: "POST" }
@@ -76,16 +78,21 @@ export function SourcesPanel({
       setSources((prev) =>
         prev.map((s) => (s.id === sourceId ? json.source : s))
       );
+    } else {
+      setError("Erneut versuchen ist fehlgeschlagen — bitte später nochmal probieren.");
     }
   }
 
   async function handleDelete(sourceId: string) {
+    setError(null);
     const res = await fetch(
       `/api/notebooks/${notebookId}/sources/${sourceId}`,
       { method: "DELETE" }
     );
     if (res.ok) {
       setSources((prev) => prev.filter((s) => s.id !== sourceId));
+    } else {
+      setError("Löschen ist fehlgeschlagen — bitte später nochmal probieren.");
     }
   }
 
@@ -95,6 +102,12 @@ export function SourcesPanel({
         notebookId={notebookId}
         onCreated={(source) => setSources((prev) => [...prev, source])}
       />
+
+      {error && (
+        <p className="border-[1.5px] border-ink bg-paper px-2 py-1 text-sm">
+          {error}
+        </p>
+      )}
 
       <ul className="flex flex-col gap-2 overflow-y-auto">
         {sources.length === 0 && (

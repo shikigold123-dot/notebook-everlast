@@ -89,4 +89,43 @@ describe("SourcesPanel", () => {
     );
     expect(screen.queryByText("Fertig")).not.toBeInTheDocument();
   });
+
+  it("zeigt eine Fehlermeldung, wenn Löschen fehlschlägt", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<SourcesPanel notebookId="nb-1" initialSources={[READY]} />);
+    await user.click(screen.getByText("Löschen"));
+
+    expect(
+      await screen.findByText(
+        "Löschen ist fehlgeschlagen — bitte später nochmal probieren."
+      )
+    ).toBeInTheDocument();
+    // Quelle bleibt erhalten, da das Löschen fehlgeschlagen ist
+    expect(screen.getByText("Fertig")).toBeInTheDocument();
+  });
+
+  it("zeigt eine Fehlermeldung, wenn Erneut-versuchen fehlschlägt", async () => {
+    const ERROR_SOURCE: SourceListItem = {
+      id: "s-1",
+      type: "url",
+      status: "error",
+      title: "Kaputt",
+      errorMessage: "Diese Website konnte nicht gelesen werden.",
+    };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<SourcesPanel notebookId="nb-1" initialSources={[ERROR_SOURCE]} />);
+    await user.click(screen.getByText("Erneut versuchen"));
+
+    expect(
+      await screen.findByText(
+        "Erneut versuchen ist fehlgeschlagen — bitte später nochmal probieren."
+      )
+    ).toBeInTheDocument();
+  });
 });
