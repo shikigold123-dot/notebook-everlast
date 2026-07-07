@@ -41,7 +41,13 @@ export async function processSource(
       content = result.content;
       meta = result.meta;
     } else {
-      // "text" wird bereits synchron in der API-Route auf ready gesetzt
+      // "text" wird bereits synchron in der API-Route auf ready gesetzt und
+      // durchläuft processSource in der Praxis nie (Task 9 ruft diese
+      // Funktion nur für pdf/url/youtube/audio auf). Dieser Zweig ist ein
+      // defensiver Fallback für "text" oder einen künftigen unbekannten Typ,
+      // damit kein Pfad ohne Terminalstatus (ready/error) endet — sonst
+      // bliebe die Zeile für immer auf "processing" hängen.
+      await markError(db, sourceId, "Unbekannter Quellentyp.");
       return;
     }
 
