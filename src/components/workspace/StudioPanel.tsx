@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
+import type {
+  AudioOverviewStatus,
+  AudioScriptTurn,
+} from "@/db/repo/audio";
 import type { ArtifactKind } from "@/db/repo/artifacts";
 
 export type ArtifactListItem = {
@@ -9,6 +13,15 @@ export type ArtifactListItem = {
   type: ArtifactKind;
   status: "pending" | "ready" | "error";
   content: unknown;
+  createdAt: string;
+};
+
+export type AudioOverviewItem = {
+  id: string;
+  status: AudioOverviewStatus;
+  script: AudioScriptTurn[] | null;
+  audioBlobUrl: string | null;
+  durationS: number | null;
   createdAt: string;
 };
 
@@ -20,6 +33,14 @@ const ARTIFACT_LABELS: Record<ArtifactKind, string> = {
   timeline: "Zeitleiste",
   briefing: "Briefing",
   mindmap: "Mind Map",
+};
+
+const AUDIO_STATUS_LABELS: Record<AudioOverviewStatus, string> = {
+  queued: "Wartet",
+  script: "Skript bereit",
+  synthesizing: "Stimmen laufen",
+  ready: "Audio bereit",
+  error: "Fehler",
 };
 
 function asRecord(value: unknown): JsonRecord {
@@ -203,20 +224,43 @@ function renderArtifact(artifact: ArtifactListItem) {
   );
 }
 
+function formatDuration(seconds: number | null) {
+  if (!seconds) return null;
+  const minutes = Math.floor(seconds / 60);
+  const rest = String(seconds % 60).padStart(2, "0");
+  return `${minutes}:${rest}`;
+}
+
 export function StudioPanel({
   notebookId,
   initialArtifacts,
+  initialAudioOverview,
   readySourceCount,
 }: {
   notebookId: string;
   initialArtifacts: ArtifactListItem[];
+  initialAudioOverview: AudioOverviewItem | null;
   readySourceCount: number;
 }) {
   const [artifacts, setArtifacts] = useState(initialArtifacts ?? []);
+  const [audioOverview, setAudioOverview] = useState(initialAudioOverview);
   const [busyType, setBusyType] = useState<ArtifactKind | null>(null);
+  const [audioBusy, setAudioBusy] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasReadySources = readySourceCount > 0;
+  const audioCanBeRequested =
+    hasReadySources && (!audioOverview || audioOverview.status === "error");
+  const canGenerateAudio = audioCanBeRequested && !audioBusy;
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   async function handleGenerate(type: ArtifactKind) {
     if (!hasReadySources || busyType) return;
@@ -242,8 +286,135 @@ export function StudioPanel({
     }
   }
 
+  async function handleGenerateAudio() {
+    if (!canGenerateAudio) return;
+
+    setAudioBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/audio`, {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (json.audioOverview) {
+        setAudioOverview(json.audioOverview);
+      }
+      if (!res.ok) {
+        setError(json.error ?? "Audio Overview konnte nicht vorbereitet werden.");
+      }
+    } catch {
+      setError("Keine Verbindung — bitte nochmal versuchen.");
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+
+  function speakScript(script: AudioScriptTurn[], index = 0) {
+    if (index >= script.length) {
+      setSpeaking(false);
+      return;
+    }
+
+    const turn = script[index];
+    const utterance = new SpeechSynthesisUtterance(turn.text);
+    utterance.lang = "de-DE";
+
+    const voices = window.speechSynthesis.getVoices();
+    const voiceIndex = turn.speaker === "A" ? 0 : 1;
+    utterance.voice = voices[voiceIndex] ?? voices[0] ?? null;
+    utterance.onend = () => speakScript(script, index + 1);
+    utterance.onerror = () => {
+      setSpeaking(false);
+      setError("Browser-Sprachausgabe wurde abgebrochen.");
+    };
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function handleToggleSpeech() {
+    if (speaking) {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeaking(false);
+      return;
+    }
+
+    const script = audioOverview?.script ?? [];
+    if (script.length === 0) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setError("Browser-Sprachausgabe ist nicht verfügbar.");
+      return;
+    }
+
+    setError(null);
+    setSpeaking(true);
+    speakScript(script);
+  }
+
   return (
     <div className="flex h-full flex-col gap-3">
+      <section className="border-[1.5px] border-ink bg-paper p-3 text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <p className="label-caps">Audio Overview</p>
+          {audioOverview && (
+            <span className="label-caps border-[1.5px] border-ink px-1.5 py-0.5 text-ink/70">
+              {AUDIO_STATUS_LABELS[audioOverview.status]}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-col gap-2">
+          {audioCanBeRequested && (
+            <ActionButton
+              type="button"
+              disabled={!canGenerateAudio}
+              onClick={handleGenerateAudio}
+            >
+              {audioBusy ? "Skript läuft ..." : "Audio vorbereiten"}
+            </ActionButton>
+          )}
+
+          {audioOverview?.script && audioOverview.script.length > 0 && (
+            <ActionButton
+              type="button"
+              variant="outline"
+              onClick={handleToggleSpeech}
+            >
+              {speaking ? "Stoppen" : "Vorlesen"}
+            </ActionButton>
+          )}
+
+          {audioOverview?.audioBlobUrl && (
+            <audio controls src={audioOverview.audioBlobUrl} className="w-full" />
+          )}
+        </div>
+
+        {!hasReadySources && (
+          <p className="mt-3 text-ink/60">
+            Füge zuerst eine bereite Quelle hinzu.
+          </p>
+        )}
+
+        {audioOverview?.durationS && (
+          <p className="label-caps mt-3 text-ink/60">
+            Dauer ca. {formatDuration(audioOverview.durationS)}
+          </p>
+        )}
+
+        {audioOverview?.script && audioOverview.script.length > 0 && (
+          <ol className="mt-3 flex max-h-80 flex-col gap-2 overflow-y-auto border-t-[1.5px] border-ink pt-3">
+            {audioOverview.script.map((turn, index) => (
+              <li key={`${turn.speaker}-${index}`} className="leading-6">
+                <span className="label-caps mr-2 border-[1.5px] border-ink px-1">
+                  {turn.speaker}
+                </span>
+                {turn.text}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
         {Object.entries(ARTIFACT_LABELS).map(([type, label]) => (
           <ActionButton
@@ -258,12 +429,6 @@ export function StudioPanel({
           </ActionButton>
         ))}
       </div>
-
-      {!hasReadySources && (
-        <p className="text-sm text-ink/60">
-          Füge zuerst eine bereite Quelle hinzu.
-        </p>
-      )}
 
       {error && (
         <p className="border-[1.5px] border-ink bg-paper px-2 py-1 text-sm">

@@ -14,6 +14,7 @@ describe("NotebookWorkspace", () => {
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
+        audioOverview={null}
       />
     );
     expect(screen.getByText(/DOSSIER 004/)).toBeInTheDocument();
@@ -27,6 +28,7 @@ describe("NotebookWorkspace", () => {
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
+        audioOverview={null}
       />
     );
     expect(screen.getByText("Quellen")).toBeInTheDocument();
@@ -41,6 +43,7 @@ describe("NotebookWorkspace", () => {
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
+        audioOverview={null}
       />
     );
     expect(screen.getByText(/noch keine quellen/i)).toBeInTheDocument();
@@ -58,6 +61,7 @@ describe("NotebookWorkspace", () => {
         notebook={NB}
         chatMessages={[]}
         artifacts={[]}
+        audioOverview={null}
         sources={[
           {
             id: "s-1",

@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { readVisitorId, UUID_RE } from "@/lib/visitor";
+import {
+  getLatestAudioOverview,
+  type AudioScriptTurn,
+} from "@/db/repo/audio";
 import { getNotebook, listNotebooks } from "@/db/repo/notebooks";
 import { listArtifacts } from "@/db/repo/artifacts";
 import { listChatMessages, type ChatCitation } from "@/db/repo/chat";
@@ -30,6 +34,7 @@ export default async function NotebookPage({
   const sources = await listSources(db, nb.id);
   const chatMessages = await listChatMessages(db, nb.id);
   const artifacts = await listArtifacts(db, nb.id);
+  const audioOverview = await getLatestAudioOverview(db, nb.id);
 
   return (
     <NotebookWorkspace
@@ -58,6 +63,18 @@ export default async function NotebookPage({
         content: item.content,
         createdAt: item.createdAt.toISOString(),
       }))}
+      audioOverview={
+        audioOverview
+          ? {
+              id: audioOverview.id,
+              status: audioOverview.status,
+              script: (audioOverview.script as AudioScriptTurn[] | null) ?? null,
+              audioBlobUrl: audioOverview.audioBlobUrl,
+              durationS: audioOverview.durationS,
+              createdAt: audioOverview.createdAt.toISOString(),
+            }
+          : null
+      }
     />
   );
 }

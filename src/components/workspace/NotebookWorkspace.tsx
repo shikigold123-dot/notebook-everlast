@@ -2,7 +2,11 @@ import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { SourcesPanel, type SourceListItem } from "./SourcesPanel";
 import { ChatPanel, type ChatMessageItem } from "./ChatPanel";
-import { StudioPanel, type ArtifactListItem } from "./StudioPanel";
+import {
+  StudioPanel,
+  type ArtifactListItem,
+  type AudioOverviewItem,
+} from "./StudioPanel";
 
 export type WorkspaceNotebook = {
   id: string;
@@ -16,11 +20,13 @@ export function NotebookWorkspace({
   sources,
   chatMessages,
   artifacts,
+  audioOverview,
 }: {
   notebook: WorkspaceNotebook;
   sources: SourceListItem[];
   chatMessages: ChatMessageItem[];
   artifacts: ArtifactListItem[];
+  audioOverview: AudioOverviewItem | null;
 }) {
   const readySourceCount = sources.filter(
     (source) => source.status === "ready"
@@ -54,6 +60,7 @@ export function NotebookWorkspace({
           <StudioPanel
             notebookId={notebook.id}
             initialArtifacts={artifacts}
+            initialAudioOverview={audioOverview}
             readySourceCount={readySourceCount}
           />
         </Panel>
