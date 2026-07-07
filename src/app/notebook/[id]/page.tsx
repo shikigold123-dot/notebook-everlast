@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { readVisitorId, UUID_RE } from "@/lib/visitor";
 import { getNotebook, listNotebooks } from "@/db/repo/notebooks";
+import { listArtifacts } from "@/db/repo/artifacts";
 import { listChatMessages, type ChatCitation } from "@/db/repo/chat";
 import { listSources } from "@/db/repo/sources";
 import { NotebookWorkspace } from "@/components/workspace/NotebookWorkspace";
@@ -28,6 +29,7 @@ export default async function NotebookPage({
 
   const sources = await listSources(db, nb.id);
   const chatMessages = await listChatMessages(db, nb.id);
+  const artifacts = await listArtifacts(db, nb.id);
 
   return (
     <NotebookWorkspace
@@ -48,6 +50,13 @@ export default async function NotebookPage({
         role: message.role,
         content: message.content,
         citations: (message.citations as ChatCitation[] | null) ?? null,
+      }))}
+      artifacts={artifacts.map((item) => ({
+        id: item.id,
+        type: item.type,
+        status: item.status,
+        content: item.content,
+        createdAt: item.createdAt.toISOString(),
       }))}
     />
   );

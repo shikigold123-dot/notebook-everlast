@@ -8,25 +8,48 @@ describe("NotebookWorkspace", () => {
   afterEach(() => cleanup());
 
   it("zeigt Dossier-Nummer und Titel im Header", () => {
-    render(<NotebookWorkspace notebook={NB} sources={[]} chatMessages={[]} />);
+    render(
+      <NotebookWorkspace
+        notebook={NB}
+        sources={[]}
+        chatMessages={[]}
+        artifacts={[]}
+      />
+    );
     expect(screen.getByText(/DOSSIER 004/)).toBeInTheDocument();
     expect(screen.getByText(/KANT/)).toBeInTheDocument();
   });
 
   it("rendert die drei Panels", () => {
-    render(<NotebookWorkspace notebook={NB} sources={[]} chatMessages={[]} />);
+    render(
+      <NotebookWorkspace
+        notebook={NB}
+        sources={[]}
+        chatMessages={[]}
+        artifacts={[]}
+      />
+    );
     expect(screen.getByText("Quellen")).toBeInTheDocument();
     expect(screen.getByText("Chat")).toBeInTheDocument();
     expect(screen.getByText("Studio")).toBeInTheDocument();
   });
 
   it("zeigt die Platzhalter-Texte", () => {
-    render(<NotebookWorkspace notebook={NB} sources={[]} chatMessages={[]} />);
+    render(
+      <NotebookWorkspace
+        notebook={NB}
+        sources={[]}
+        chatMessages={[]}
+        artifacts={[]}
+      />
+    );
     expect(screen.getByText(/noch keine quellen/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/füge zuerst eine bereite quelle hinzu/i)
+      screen.getAllByText(/füge zuerst eine bereite quelle hinzu/i)
+    ).toHaveLength(2);
+    expect(
+      screen.getByText(/noch keine studio-artefakte generiert/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/study guide \/ phase 4/i)).toBeInTheDocument();
   });
 
   it("zeigt eine übergebene Quelle mit Status", () => {
@@ -34,6 +57,7 @@ describe("NotebookWorkspace", () => {
       <NotebookWorkspace
         notebook={NB}
         chatMessages={[]}
+        artifacts={[]}
         sources={[
           {
             id: "s-1",
