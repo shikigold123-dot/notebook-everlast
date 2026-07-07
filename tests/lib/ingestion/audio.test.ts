@@ -46,6 +46,26 @@ describe("extractAudio", () => {
     expect(result.meta.duration_s).toBe(12);
   });
 
+  it("erkennt den echten Dateityp aus der Blob-URL statt hart mp3 anzunehmen", async () => {
+    createTranscriptionMock.mockResolvedValue({ text: "Hallo.", duration: 5 });
+
+    await extractAudio("https://blob.example/aufnahme-abc123.wav");
+
+    const callArgs = createTranscriptionMock.mock.calls[0][0];
+    expect(callArgs.file.name).toBe("audio.wav");
+    expect(callArgs.file.type).toBe("audio/wav");
+  });
+
+  it("fällt bei unbekannter/fehlender Endung auf mp3 zurück", async () => {
+    createTranscriptionMock.mockResolvedValue({ text: "Hallo.", duration: 5 });
+
+    await extractAudio("https://blob.example/aufnahme-ohne-endung");
+
+    const callArgs = createTranscriptionMock.mock.calls[0][0];
+    expect(callArgs.file.name).toBe("audio.mp3");
+    expect(callArgs.file.type).toBe("audio/mpeg");
+  });
+
   it("wirft IngestionError, wenn der Download fehlschlägt", async () => {
     vi.stubGlobal(
       "fetch",

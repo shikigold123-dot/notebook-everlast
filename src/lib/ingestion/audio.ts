@@ -20,6 +20,21 @@ function getClient(): OpenAI {
   return _client;
 }
 
+const EXTENSION_MIME: Record<string, string> = {
+  mp3: "audio/mpeg",
+  mp4: "audio/mp4",
+  wav: "audio/wav",
+  m4a: "audio/x-m4a",
+  webm: "audio/webm",
+};
+
+function guessAudioFile(blobUrl: string): { filename: string; mimeType: string } {
+  const match = blobUrl.match(/\.([a-zA-Z0-9]+)(?:\?.*)?$/);
+  const ext = match ? match[1].toLowerCase() : "mp3";
+  const mimeType = EXTENSION_MIME[ext] ?? "audio/mpeg";
+  return { filename: `audio.${ext in EXTENSION_MIME ? ext : "mp3"}`, mimeType };
+}
+
 export async function extractAudio(
   blobUrl: string
 ): Promise<AudioExtractionResult> {
@@ -34,7 +49,8 @@ export async function extractAudio(
     throw new IngestionError("Die Audio-Datei konnte nicht geladen werden.");
   }
 
-  const file = new File([buffer], "audio.mp3", { type: "audio/mpeg" });
+  const { filename, mimeType } = guessAudioFile(blobUrl);
+  const file = new File([buffer], filename, { type: mimeType });
 
   try {
     const client = getClient();
