@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
+import { SourcesPanel, type SourceListItem } from "./SourcesPanel";
 
 export type WorkspaceNotebook = {
   id: string;
@@ -10,8 +11,10 @@ export type WorkspaceNotebook = {
 
 export function NotebookWorkspace({
   notebook,
+  sources,
 }: {
   notebook: WorkspaceNotebook;
+  sources: SourceListItem[];
 }) {
   return (
     <div className="flex h-dvh flex-col">
@@ -25,11 +28,8 @@ export function NotebookWorkspace({
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 lg:grid-cols-[280px_1fr_280px]">
-        <Panel label="Quellen" count={0}>
-          <p className="text-sm text-ink/60">
-            Noch keine Quellen. PDF, Website, YouTube oder Audio — kommt in
-            Phase 2 hierher.
-          </p>
+        <Panel label="Quellen" count={sources.length}>
+          <SourcesPanel notebookId={notebook.id} initialSources={sources} />
         </Panel>
 
         <Panel label="Chat">
@@ -51,7 +51,9 @@ export function NotebookWorkspace({
             <li className="border border-dashed border-ink p-2">
               ▶ Audio Overview
             </li>
-            <li className="border border-dashed border-ink p-2">Study Guide</li>
+            <li className="border border-dashed border-ink p-2">
+              Study Guide
+            </li>
             <li className="border border-dashed border-ink p-2">Mind Map</li>
           </ul>
         </Panel>
