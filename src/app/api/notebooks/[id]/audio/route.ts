@@ -5,7 +5,9 @@ import {
   createQueuedAudioOverview,
   getLatestAudioOverview,
   markAudioError,
+  markAudioReady,
   markAudioScript,
+  markAudioSynthesizing,
 } from "@/db/repo/audio";
 import { getNotebook } from "@/db/repo/notebooks";
 import { listSources } from "@/db/repo/sources";
@@ -18,6 +20,11 @@ import {
   AudioGenerationError,
   generateAudioScript,
 } from "@/lib/audio/openrouter";
+import {
+  AudioSynthesisError,
+  isAudioTtsConfigured,
+  synthesizeAudioOverview,
+} from "@/lib/audio/tts";
 import type { ChatSource } from "@/lib/chat/openrouter";
 
 function labelFor(index: number) {
@@ -112,14 +119,40 @@ export async function POST(
   }
 
   const created = await createQueuedAudioOverview(db, notebookId);
+  let generatedScript:
+    | Awaited<ReturnType<typeof generateAudioScript>>
+    | undefined;
 
   try {
-    const script = await generateAudioScript({ sources });
-    const audioOverview = await markAudioScript(db, created.id, script);
+    generatedScript = await generateAudioScript({ sources });
+    let audioOverview = await markAudioScript(db, created.id, generatedScript);
+
+    if (isAudioTtsConfigured()) {
+      audioOverview = await markAudioSynthesizing(db, created.id);
+      const audio = await synthesizeAudioOverview({
+        notebookId,
+        audioOverviewId: created.id,
+        script: generatedScript,
+      });
+      audioOverview = await markAudioReady(db, created.id, audio);
+    }
+
     return NextResponse.json({ audioOverview }, { status: 201 });
   } catch (err) {
     if (err instanceof AudioGenerationError) {
       const audioOverview = await markAudioError(db, created.id, err.message);
+      return NextResponse.json(
+        { error: err.message, audioOverview },
+        { status: 502 }
+      );
+    }
+    if (err instanceof AudioSynthesisError) {
+      const audioOverview = await markAudioError(
+        db,
+        created.id,
+        err.message,
+        generatedScript
+      );
       return NextResponse.json(
         { error: err.message, audioOverview },
         { status: 502 }

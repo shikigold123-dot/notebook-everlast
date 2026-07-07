@@ -17,7 +17,16 @@ chatten (mit klickbaren Zitaten), Artefakte generieren, KI-Podcast erzeugen.
    - `OPENAI_API_KEY` (OpenAI — nur für Audio-Transkription)
    - `BLOB_READ_WRITE_TOKEN` (Vercel Blob — im Vercel-Dashboard einen Blob-Store
      anlegen und den Token kopieren)
+   - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_A`, `ELEVENLABS_VOICE_B`
+     (optional — echte MP3-Erzeugung für Audio Overview; ohne diese Werte bleibt
+     das Podcast-Skript verfügbar)
 5. `npm run dev` → http://localhost:3000
+
+Demo-Dossier seedbar machen:
+
+```bash
+npm run db:seed:demo
+```
 
 ## Tests
 

@@ -53,12 +53,43 @@ export async function markAudioScript(
   return updated ?? null;
 }
 
-export async function markAudioError(db: Db, id: string, message: string) {
+export async function markAudioSynthesizing(db: Db, id: string) {
+  const [updated] = await db
+    .update(audioOverview)
+    .set({ status: "synthesizing" })
+    .where(eq(audioOverview.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function markAudioReady(
+  db: Db,
+  id: string,
+  data: { audioBlobUrl: string; durationS: number }
+) {
+  const [updated] = await db
+    .update(audioOverview)
+    .set({
+      status: "ready",
+      audioBlobUrl: data.audioBlobUrl,
+      durationS: data.durationS,
+    })
+    .where(eq(audioOverview.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function markAudioError(
+  db: Db,
+  id: string,
+  message: string,
+  script?: AudioScriptTurn[]
+) {
   const [updated] = await db
     .update(audioOverview)
     .set({
       status: "error",
-      script: [{ speaker: "A", text: message }],
+      script: script ?? [{ speaker: "A", text: message }],
     })
     .where(eq(audioOverview.id, id))
     .returning();

@@ -32,8 +32,21 @@ vi.mock("@/lib/audio/openrouter", async (importOriginal) => {
   };
 });
 
+const isAudioTtsConfiguredMock = vi.fn();
+const synthesizeAudioOverviewMock = vi.fn();
+vi.mock("@/lib/audio/tts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/tts")>();
+  return {
+    ...actual,
+    isAudioTtsConfigured: () => isAudioTtsConfiguredMock(),
+    synthesizeAudioOverview: (...args: unknown[]) =>
+      synthesizeAudioOverviewMock(...args),
+  };
+});
+
 import { GET, POST } from "@/app/api/notebooks/[id]/audio/route";
 import { AudioGenerationError } from "@/lib/audio/openrouter";
+import { AudioSynthesisError } from "@/lib/audio/tts";
 
 const VISITOR = "aaaaaaaa-0000-4000-8000-000000000001";
 let notebookId: string;
@@ -47,6 +60,11 @@ beforeEach(async () => {
     { speaker: "A", text: "Frage" },
     { speaker: "B", text: "Antwort" },
   ]);
+  isAudioTtsConfiguredMock.mockReset().mockReturnValue(false);
+  synthesizeAudioOverviewMock.mockReset().mockResolvedValue({
+    audioBlobUrl: "https://blob.example/audio.mp3",
+    durationS: 42,
+  });
   delete process.env.LIMIT_AUDIO_PER_VISITOR_DAY;
   delete process.env.LIMIT_AUDIO_GLOBAL_DAY;
   delete process.env.DAILY_BUDGET_CENTS;
@@ -154,6 +172,58 @@ describe("POST /api/notebooks/[id]/audio", () => {
     const json = await res.json();
     expect(json.error).toBe("Kaputt");
     expect(json.audioOverview.status).toBe("error");
+  });
+
+  it("erzeugt eine MP3, wenn TTS konfiguriert ist", async () => {
+    isAudioTtsConfiguredMock.mockReturnValue(true);
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    const res = await POST(new Request("http://localhost"), ctx());
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.audioOverview.status).toBe("ready");
+    expect(json.audioOverview.audioBlobUrl).toBe(
+      "https://blob.example/audio.mp3"
+    );
+    expect(synthesizeAudioOverviewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notebookId,
+        script: [
+          { speaker: "A", text: "Frage" },
+          { speaker: "B", text: "Antwort" },
+        ],
+      })
+    );
+  });
+
+  it("bewahrt das Skript, wenn TTS fehlschlägt", async () => {
+    isAudioTtsConfiguredMock.mockReturnValue(true);
+    synthesizeAudioOverviewMock.mockRejectedValue(
+      new AudioSynthesisError("TTS kaputt")
+    );
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    const res = await POST(new Request("http://localhost"), ctx());
+
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.error).toBe("TTS kaputt");
+    expect(json.audioOverview.status).toBe("error");
+    expect(json.audioOverview.script).toEqual([
+      { speaker: "A", text: "Frage" },
+      { speaker: "B", text: "Antwort" },
+    ]);
   });
 
   it("liefert 429 ab dem Audio-Tageslimit", async () => {

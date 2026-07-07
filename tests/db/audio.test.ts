@@ -8,7 +8,9 @@ import {
   estimateScriptDuration,
   getLatestAudioOverview,
   markAudioError,
+  markAudioReady,
   markAudioScript,
+  markAudioSynthesizing,
 } from "@/db/repo/audio";
 
 const VISITOR = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -56,6 +58,21 @@ describe("Audio-Repository", () => {
 
     expect(updated?.status).toBe("error");
     expect(updated?.script).toEqual([{ speaker: "A", text: "Kaputt" }]);
+  });
+
+  it("setzt Synthese- und Ready-Status", async () => {
+    const created = await createQueuedAudioOverview(db, notebookId);
+    const synthesizing = await markAudioSynthesizing(db, created.id);
+    expect(synthesizing?.status).toBe("synthesizing");
+
+    const ready = await markAudioReady(db, created.id, {
+      audioBlobUrl: "https://blob.example/audio.mp3",
+      durationS: 120,
+    });
+
+    expect(ready?.status).toBe("ready");
+    expect(ready?.audioBlobUrl).toBe("https://blob.example/audio.mp3");
+    expect(ready?.durationS).toBe(120);
   });
 
   it("schätzt Dauer aus Wortanzahl", () => {
