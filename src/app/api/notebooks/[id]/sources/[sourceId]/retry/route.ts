@@ -27,6 +27,12 @@ export async function POST(
       { status: 404 }
     );
   }
+  if (notebook.isDemo) {
+    return NextResponse.json(
+      { error: "Demo-Dossier ist schreibgeschützt." },
+      { status: 403 }
+    );
+  }
 
   const updated = await retrySource(db, notebookId, sourceId);
   if (!updated) {

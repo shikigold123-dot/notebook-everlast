@@ -26,6 +26,12 @@ export async function DELETE(
       { status: 404 }
     );
   }
+  if (notebook.isDemo) {
+    return NextResponse.json(
+      { error: "Demo-Dossier ist schreibgeschützt." },
+      { status: 403 }
+    );
+  }
 
   await deleteSource(db, notebookId, sourceId);
   return NextResponse.json({ ok: true });

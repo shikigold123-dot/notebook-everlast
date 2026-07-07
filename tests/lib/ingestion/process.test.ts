@@ -93,6 +93,30 @@ describe("processSource", () => {
     expect(updated?.errorMessage).toContain("Token-Limit");
   });
 
+  it("setzt eine Quelle auf error, wenn die Dossier-Token-Summe überschritten wird", async () => {
+    process.env.LIMIT_TOKENS_PER_NOTEBOOK = "10";
+    await createSource(db, notebookId, {
+      type: "text",
+      title: "Vorhanden",
+      content: "Schon fertig.",
+      tokenCount: 8,
+    });
+    const src = await createSource(db, notebookId, {
+      type: "url",
+      title: "Warten …",
+      originalUrl: "https://example.com/artikel",
+    });
+    vi.mocked(extractUrl).mockResolvedValue({ title: "Titel", content: "Text" });
+    vi.mocked(countTokens).mockResolvedValue(5);
+
+    await processSource(db, notebookId, src.id);
+
+    const updated = await getSource(db, notebookId, src.id);
+    expect(updated?.status).toBe("error");
+    expect(updated?.errorMessage).toContain("13 Tokens");
+    expect(updated?.errorMessage).toContain("Token-Limit");
+  });
+
   it("normalisiert unerwartete Fehler zu einer generischen deutschen Meldung", async () => {
     const src = await createSource(db, notebookId, {
       type: "url",

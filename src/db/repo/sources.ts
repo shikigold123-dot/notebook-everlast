@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, ne } from "drizzle-orm";
 import { source } from "@/db/schema";
 import type { Db } from "@/db";
 import { LIMITS } from "@/lib/limits";
@@ -30,6 +30,25 @@ export async function getSource(db: Db, notebookId: string, sourceId: string) {
   return rows[0] ?? null;
 }
 
+export async function getReadyTokenTotal(
+  db: Db,
+  notebookId: string,
+  exceptSourceId?: string
+) {
+  const rows = await db
+    .select({ tokenCount: source.tokenCount })
+    .from(source)
+    .where(
+      and(
+        eq(source.notebookId, notebookId),
+        eq(source.status, "ready"),
+        exceptSourceId ? ne(source.id, exceptSourceId) : undefined
+      )
+    );
+
+  return rows.reduce((sum, row) => sum + (row.tokenCount ?? 0), 0);
+}
+
 export async function createSource(
   db: Db,
   notebookId: string,
@@ -44,6 +63,17 @@ export async function createSource(
     throw new LimitExceededError(
       `Maximal ${LIMITS.sourcesPerNotebook} Quellen pro Dossier — lösch eine, um Platz zu schaffen.`
     );
+  }
+
+  if (input.type === "text" && input.tokenCount !== undefined) {
+    const existingTokens = await getReadyTokenTotal(db, notebookId);
+    if (existingTokens + input.tokenCount > LIMITS.tokensPerNotebook) {
+      throw new LimitExceededError(
+        `Dieses Dossier überschreitet damit das Token-Limit von ${LIMITS.tokensPerNotebook.toLocaleString(
+          "de-DE"
+        )} Tokens.`
+      );
+    }
   }
 
   const [created] = await db

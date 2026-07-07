@@ -5,7 +5,7 @@ import { createTestDb } from "../helpers/db";
 import type { Db } from "@/db";
 import { createNotebook } from "@/db/repo/notebooks";
 import { createSource, getSource } from "@/db/repo/sources";
-import { source } from "@/db/schema";
+import { notebook, source } from "@/db/schema";
 
 let testDb: Db;
 vi.mock("@/db", () => ({
@@ -76,6 +76,23 @@ describe("DELETE /api/notebooks/[id]/sources/[sourceId]", () => {
     );
     expect(res.status).toBe(401);
   });
+
+  it("blockiert Löschen in Demo-Dossiers", async () => {
+    await testDb
+      .update(notebook)
+      .set({ isDemo: true })
+      .where(eq(notebook.id, notebookId));
+
+    const res = await DELETE(
+      new Request("http://localhost", { method: "DELETE" }),
+      ctx()
+    );
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    const remaining = await getSource(testDb, notebookId, sourceId);
+    expect(remaining).not.toBeNull();
+  });
 });
 
 describe("POST /api/notebooks/[id]/sources/[sourceId]/retry", () => {
@@ -111,5 +128,21 @@ describe("POST /api/notebooks/[id]/sources/[sourceId]/retry", () => {
       }
     );
     expect(res.status).toBe(404);
+  });
+
+  it("blockiert Retry in Demo-Dossiers", async () => {
+    await testDb
+      .update(notebook)
+      .set({ isDemo: true })
+      .where(eq(notebook.id, notebookId));
+
+    const res = await retryPOST(
+      new Request("http://localhost", { method: "POST" }),
+      ctx()
+    );
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(processSourceMock).not.toHaveBeenCalled();
   });
 });

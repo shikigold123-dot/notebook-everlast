@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb } from "../helpers/db";
 import type { Db } from "@/db";
 import { createNotebook } from "@/db/repo/notebooks";
+import { notebook } from "@/db/schema";
 
 let testDb: Db;
 vi.mock("@/db", () => ({
@@ -47,6 +49,7 @@ beforeEach(async () => {
   countTokensMock.mockReset().mockResolvedValue(10);
   processSourceMock.mockReset().mockResolvedValue(undefined);
   delete process.env.LIMIT_SOURCES_PER_NOTEBOOK;
+  delete process.env.LIMIT_TOKENS_PER_NOTEBOOK;
 });
 
 function ctx() {
@@ -138,6 +141,18 @@ describe("POST /api/notebooks/[id]/sources", () => {
     expect(res.status).toBe(404);
   });
 
+  it("blockiert Schreibzugriff auf Demo-Dossiers", async () => {
+    await testDb
+      .update(notebook)
+      .set({ isDemo: true })
+      .where(eq(notebook.id, notebookId));
+
+    const res = await POST(postRequest({ type: "text", content: "x" }), ctx());
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+  });
+
   it("liefert 429 ab dem Quellen-Limit", async () => {
     process.env.LIMIT_SOURCES_PER_NOTEBOOK = "1";
     await POST(postRequest({ type: "text", content: "Eins" }), ctx());
@@ -145,6 +160,18 @@ describe("POST /api/notebooks/[id]/sources", () => {
     expect(res.status).toBe(429);
     const json = await res.json();
     expect(json.error).toContain("Maximal 1");
+  });
+
+  it("liefert 429, wenn Text die Dossier-Token-Summe überschreitet", async () => {
+    process.env.LIMIT_TOKENS_PER_NOTEBOOK = "10";
+    countTokensMock.mockResolvedValueOnce(6).mockResolvedValueOnce(5);
+
+    await POST(postRequest({ type: "text", content: "Eins" }), ctx());
+    const res = await POST(postRequest({ type: "text", content: "Zwei" }), ctx());
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toContain("Token-Limit");
   });
 });
 

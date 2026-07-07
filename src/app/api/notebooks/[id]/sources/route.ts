@@ -48,6 +48,12 @@ export async function POST(
       { status: 404 }
     );
   }
+  if (notebook.isDemo) {
+    return NextResponse.json(
+      { error: "Demo-Dossier ist schreibgeschützt." },
+      { status: 403 }
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const type = body?.type;

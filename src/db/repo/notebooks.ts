@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, or } from "drizzle-orm";
 import { notebook } from "@/db/schema";
 import type { Db } from "@/db";
 import { ensureVisitor } from "@/lib/visitor";
@@ -45,10 +45,12 @@ export async function getNotebook(db: Db, visitorId: string, id: string) {
   const rows = await db
     .select()
     .from(notebook)
-    .where(eq(notebook.id, id))
+    .where(
+      and(
+        eq(notebook.id, id),
+        or(eq(notebook.visitorId, visitorId), eq(notebook.isDemo, true))
+      )
+    )
     .limit(1);
-  const nb = rows[0];
-  if (!nb) return null;
-  if (nb.visitorId !== visitorId && !nb.isDemo) return null;
-  return nb;
+  return rows[0] ?? null;
 }

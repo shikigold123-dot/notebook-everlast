@@ -26,6 +26,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   delete process.env.LIMIT_SOURCES_PER_NOTEBOOK;
+  delete process.env.LIMIT_TOKENS_PER_NOTEBOOK;
 });
 
 describe("createSource", () => {
@@ -65,6 +66,25 @@ describe("createSource", () => {
         title: "Zwei",
         content: "B",
         tokenCount: 1,
+      })
+    ).rejects.toThrow(LimitExceededError);
+  });
+
+  it("wirft LimitExceededError, wenn Text die Dossier-Token-Summe überschreitet", async () => {
+    process.env.LIMIT_TOKENS_PER_NOTEBOOK = "10";
+    await createSource(db, notebookId, {
+      type: "text",
+      title: "Eins",
+      content: "A",
+      tokenCount: 6,
+    });
+
+    await expect(
+      createSource(db, notebookId, {
+        type: "text",
+        title: "Zwei",
+        content: "B",
+        tokenCount: 5,
       })
     ).rejects.toThrow(LimitExceededError);
   });

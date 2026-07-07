@@ -1,5 +1,11 @@
 import type { Db } from "@/db";
-import { getSource, markProcessing, markReady, markError } from "@/db/repo/sources";
+import {
+  getReadyTokenTotal,
+  getSource,
+  markProcessing,
+  markReady,
+  markError,
+} from "@/db/repo/sources";
 import { extractPdf } from "./pdf";
 import { extractUrl } from "./url";
 import { extractYoutube } from "./youtube";
@@ -53,13 +59,16 @@ export async function processSource(
 
     const tokenCount = await countTokens(content);
 
-    if (tokenCount > LIMITS.tokensPerNotebook) {
+    const existingTokens = await getReadyTokenTotal(db, notebookId, sourceId);
+    if (existingTokens + tokenCount > LIMITS.tokensPerNotebook) {
       await markError(
         db,
         sourceId,
-        `Diese Quelle ist mit ${tokenCount.toLocaleString(
+        `Diese Quelle überschreitet mit den vorhandenen Quellen (${(
+          existingTokens + tokenCount
+        ).toLocaleString(
           "de-DE"
-        )} Tokens zu groß für das Token-Limit von ${LIMITS.tokensPerNotebook.toLocaleString(
+        )} Tokens) das Token-Limit von ${LIMITS.tokensPerNotebook.toLocaleString(
           "de-DE"
         )} pro Dossier.`
       );

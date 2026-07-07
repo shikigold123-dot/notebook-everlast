@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb } from "../helpers/db";
 import type { Db } from "@/db";
 import { createNotebook } from "@/db/repo/notebooks";
+import { notebook } from "@/db/schema";
 
 const handleUploadMock = vi.fn();
 vi.mock("@vercel/blob/client", () => ({
@@ -102,6 +104,19 @@ describe("POST /api/notebooks/[id]/blob-upload-token", () => {
       }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it("blockiert Upload-Tokens für Demo-Dossiers", async () => {
+    await testDb
+      .update(notebook)
+      .set({ isDemo: true })
+      .where(eq(notebook.id, notebookId));
+
+    const res = await POST(postRequest({}), ctx());
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(handleUploadMock).not.toHaveBeenCalled();
   });
 
   it("liefert 400, wenn handleUpload einen Fehler wirft", async () => {
