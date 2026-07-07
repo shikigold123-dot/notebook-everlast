@@ -7,7 +7,6 @@ vi.mock("youtubei.js", () => ({
 }));
 
 import { extractYoutube } from "@/lib/ingestion/youtube";
-import { IngestionError } from "@/lib/ingestion/errors";
 
 beforeEach(() => {
   createMock.mockReset();
