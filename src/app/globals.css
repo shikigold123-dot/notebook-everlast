@@ -22,3 +22,24 @@ body {
   font-family: var(--font-mono);
   font-size: 0.6875rem; /* 11px */
 }
+
+.react-flow__controls {
+  border: 1.5px solid var(--color-ink);
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  border-bottom: 1.5px solid var(--color-ink);
+  background: var(--color-paper);
+  border-radius: 0;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--color-signal);
+}
+
+.react-flow__attribution {
+  background: var(--color-paper);
+  border: 1.5px solid var(--color-ink);
+  color: var(--color-ink);
+}

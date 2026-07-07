@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
 const plexMono = IBM_Plex_Mono({

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { MindMapCanvas } from "./MindMapCanvas";
 import type {
   AudioOverviewStatus,
   AudioScriptTurn,
@@ -186,26 +187,6 @@ function renderBriefing(content: JsonRecord) {
   );
 }
 
-function renderMindNode(node: unknown, path: string) {
-  const row = asRecord(node);
-  const children = asArray(row.children);
-
-  return (
-    <li key={path}>
-      <span className="inline-block border-[1.5px] border-ink bg-paper px-2 py-1">
-        {asString(row.label)}
-      </span>
-      {children.length > 0 && (
-        <ul className="ml-3 mt-2 flex flex-col gap-2 border-l-[1.5px] border-ink pl-3">
-          {children.map((child, index) =>
-            renderMindNode(child, `${path}-${index}`)
-          )}
-        </ul>
-      )}
-    </li>
-  );
-}
-
 function renderArtifact(artifact: ArtifactListItem) {
   const content = asRecord(artifact.content);
 
@@ -214,7 +195,7 @@ function renderArtifact(artifact: ArtifactListItem) {
   if (artifact.type === "timeline") return renderTimeline(content);
   if (artifact.type === "briefing") return renderBriefing(content);
   if (artifact.type === "mindmap") {
-    return <ul>{renderMindNode(content, artifact.id)}</ul>;
+    return <MindMapCanvas tree={artifact.content} />;
   }
 
   return (

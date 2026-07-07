@@ -16,6 +16,7 @@
     "@mozilla/readability": "^0.6.0",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.5.0",
+    "@xyflow/react": "^12.11.2",
     "drizzle-orm": "^0.45.2",
     "linkedom": "^0.18.12",
     "next": "16.2.10",
