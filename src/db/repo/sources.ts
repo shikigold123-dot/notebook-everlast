@@ -1,0 +1,117 @@
+import { and, asc, count, eq } from "drizzle-orm";
+import { source } from "@/db/schema";
+import type { Db } from "@/db";
+import { LIMITS } from "@/lib/limits";
+import { LimitExceededError } from "./notebooks";
+
+export type NewSourceInput = {
+  type: "text" | "pdf" | "url" | "youtube" | "audio";
+  title: string;
+  content?: string;
+  tokenCount?: number;
+  originalUrl?: string;
+  blobUrl?: string;
+};
+
+export async function listSources(db: Db, notebookId: string) {
+  return db
+    .select()
+    .from(source)
+    .where(eq(source.notebookId, notebookId))
+    .orderBy(asc(source.createdAt), asc(source.id));
+}
+
+export async function getSource(db: Db, notebookId: string, sourceId: string) {
+  const rows = await db
+    .select()
+    .from(source)
+    .where(and(eq(source.id, sourceId), eq(source.notebookId, notebookId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createSource(
+  db: Db,
+  notebookId: string,
+  input: NewSourceInput
+) {
+  const [{ value: existing }] = await db
+    .select({ value: count() })
+    .from(source)
+    .where(eq(source.notebookId, notebookId));
+
+  if (existing >= LIMITS.sourcesPerNotebook) {
+    throw new LimitExceededError(
+      `Maximal ${LIMITS.sourcesPerNotebook} Quellen pro Dossier — lösch eine, um Platz zu schaffen.`
+    );
+  }
+
+  const [created] = await db
+    .insert(source)
+    .values({
+      notebookId,
+      type: input.type,
+      title: input.title,
+      status: input.type === "text" ? "ready" : "pending",
+      content: input.content ?? null,
+      tokenCount: input.tokenCount ?? null,
+      originalUrl: input.originalUrl ?? null,
+      blobUrl: input.blobUrl ?? null,
+    })
+    .returning();
+  return created;
+}
+
+export async function deleteSource(
+  db: Db,
+  notebookId: string,
+  sourceId: string
+) {
+  await db
+    .delete(source)
+    .where(and(eq(source.id, sourceId), eq(source.notebookId, notebookId)));
+}
+
+export async function markProcessing(db: Db, sourceId: string) {
+  await db
+    .update(source)
+    .set({ status: "processing" })
+    .where(eq(source.id, sourceId));
+}
+
+export async function markReady(
+  db: Db,
+  sourceId: string,
+  data: { content: string; tokenCount: number; meta?: unknown; title?: string }
+) {
+  await db
+    .update(source)
+    .set({
+      status: "ready",
+      content: data.content,
+      tokenCount: data.tokenCount,
+      meta: data.meta ?? null,
+      ...(data.title ? { title: data.title } : {}),
+    })
+    .where(eq(source.id, sourceId));
+}
+
+export async function markError(db: Db, sourceId: string, message: string) {
+  await db
+    .update(source)
+    .set({ status: "error", errorMessage: message })
+    .where(eq(source.id, sourceId));
+}
+
+export async function retrySource(
+  db: Db,
+  notebookId: string,
+  sourceId: string
+) {
+  const [updated] = await db
+    .update(source)
+    .set({ status: "pending", errorMessage: null })
+    .where(and(eq(source.id, sourceId), eq(source.notebookId, notebookId)))
+    .returning();
+  return updated ?? null;
+}
