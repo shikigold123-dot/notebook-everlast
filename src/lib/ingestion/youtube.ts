@@ -14,6 +14,23 @@ function extractVideoId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+type YoutubeInfo = {
+  basic_info: { title?: string };
+  getTranscript: () => Promise<{
+    transcript: {
+      content?: {
+        body?: {
+          initial_segments?: {
+            snippet: { text: string };
+            start_ms: number;
+            end_ms: number;
+          }[];
+        };
+      } | null;
+    };
+  }>;
+};
+
 export async function extractYoutube(
   url: string
 ): Promise<YoutubeExtractionResult> {
@@ -22,25 +39,14 @@ export async function extractYoutube(
     throw new IngestionError("Das ist keine gültige YouTube-URL.");
   }
 
-  let info: {
-    basic_info: { title?: string };
-    getTranscript: () => Promise<{
-      transcript: {
-        content?: {
-          body?: {
-            initial_segments?: {
-              snippet: { text: string };
-              start_ms: number;
-              end_ms: number;
-            }[];
-          };
-        };
-      };
-    }>;
-  };
+  let info: YoutubeInfo;
   try {
     const yt = await Innertube.create({ retrieve_player: false });
-    info = await yt.getInfo(videoId);
+    // youtubei.js' echte VideoInfo/TranscriptInfo-Typen sind komplexer als
+    // hier gebraucht; wir casten an der API-Grenze auf die schlanke Form,
+    // die dieses Modul tatsächlich konsumiert (Tests mocken die Bibliothek
+    // ohnehin vollständig, sodass die echte Laufzeit-Form nie durchläuft).
+    info = (await yt.getInfo(videoId)) as unknown as YoutubeInfo;
   } catch {
     throw new IngestionError(
       "Dieses YouTube-Video konnte nicht geladen werden."

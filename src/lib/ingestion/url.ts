@@ -23,7 +23,7 @@ export async function extractUrl(
     document as unknown as Document
   ).parse();
 
-  const content = article?.textContent.trim() ?? "";
+  const content = article?.textContent?.trim() ?? "";
 
   // Readability liefert auch für triviale Fragmente (z. B. ein einzelnes
   // <div> ohne Artikelstruktur) ein Ergebnis statt null zurück. Eine
