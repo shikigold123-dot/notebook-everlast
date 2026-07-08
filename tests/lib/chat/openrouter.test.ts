@@ -9,7 +9,12 @@ import {
 } from "@/lib/chat/openrouter";
 
 const SOURCES: ChatSource[] = [
-  { id: "src-1", label: "S-01", title: "Erste Quelle", content: "Alpha" },
+  {
+    id: "src-1",
+    label: "S-01",
+    title: "Erste Quelle",
+    content: "Alpha ist der erste Abschnitt.",
+  },
   { id: "src-2", label: "S-02", title: "Zweite Quelle", content: "Beta" },
 ];
 
@@ -96,8 +101,38 @@ describe("generateChatAnswer", () => {
 describe("extractCitations", () => {
   it("extrahiert eindeutige Quellenchips aus der Antwort", () => {
     expect(extractCitations("A [S-01], B [S-02], nochmal [S-01]", SOURCES)).toEqual([
-      { sourceId: "src-1", label: "S-01", title: "Erste Quelle" },
-      { sourceId: "src-2", label: "S-02", title: "Zweite Quelle" },
+      {
+        sourceId: "src-1",
+        label: "S-01",
+        title: "Erste Quelle",
+        marker: "[S-01]",
+        start: 0,
+        end: 30,
+        citedText: "Alpha ist der erste Abschnitt.",
+      },
+      {
+        sourceId: "src-2",
+        label: "S-02",
+        title: "Zweite Quelle",
+        marker: "[S-02]",
+        start: 0,
+        end: 4,
+        citedText: "Beta",
+      },
+    ]);
+  });
+
+  it("extrahiert Zeichenoffsets aus Quellenchips", () => {
+    expect(extractCitations("Aussage [S-01#6-9]", SOURCES)).toEqual([
+      {
+        sourceId: "src-1",
+        label: "S-01",
+        title: "Erste Quelle",
+        marker: "[S-01#6-9]",
+        start: 6,
+        end: 9,
+        citedText: "ist",
+      },
     ]);
   });
 });

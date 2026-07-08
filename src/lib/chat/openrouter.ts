@@ -32,7 +32,7 @@ function getApiKey() {
 }
 
 function sourceBlock(source: ChatSource) {
-  return `[${source.label}] ${source.title}\n${source.content}`;
+  return `[${source.label}] ${source.title}\nZeichenbereich: 0-${source.content.length}\n${source.content}`;
 }
 
 export function buildChatMessages(
@@ -48,7 +48,8 @@ export function buildChatMessages(
       role: "system",
       content:
         "Du bist Everlast, ein deutscher Quellen-Assistent. Antworte knapp, präzise und nur mit Informationen aus den bereitgestellten Quellen. " +
-        "Jede konkrete Aussage braucht mindestens eine Quellenmarke im Format [S-01]. Wenn die Quellen nicht reichen, sag das klar.",
+        "Jede konkrete Aussage braucht mindestens eine Quellenmarke im Format [S-01#start-end], wobei start und end Zeichenpositionen im Rohtext der Quelle sind. " +
+        "Wenn du die Zeichenpositionen nicht sicher bestimmen kannst, nutze [S-01]. Wenn die Quellen nicht reichen, sag das klar.",
     },
     {
       role: "user",
@@ -126,15 +127,41 @@ export function extractCitations(
   sources: ChatSource[]
 ): ChatCitation[] {
   const byLabel = new Map(sources.map((source) => [source.label, source]));
-  const labels = new Set<string>();
-  for (const match of answer.matchAll(/\[(S-\d{2})\]/g)) {
-    labels.add(match[1]);
+  const citations = new Map<string, ChatCitation>();
+
+  for (const match of answer.matchAll(/\[(S-\d{2})(?:#(\d+)-(\d+))?\]/g)) {
+    const marker = match[0];
+    const source = byLabel.get(match[1]);
+    if (!source) continue;
+
+    const parsedStart = match[2] ? Number(match[2]) : null;
+    const parsedEnd = match[3] ? Number(match[3]) : null;
+    const hasValidRange =
+      parsedStart !== null &&
+      parsedEnd !== null &&
+      Number.isInteger(parsedStart) &&
+      Number.isInteger(parsedEnd) &&
+      parsedStart >= 0 &&
+      parsedEnd > parsedStart &&
+      parsedStart < source.content.length;
+
+    const fallbackEnd = Math.min(source.content.length, 320);
+    const start = hasValidRange ? parsedStart : 0;
+    const end = hasValidRange
+      ? Math.min(parsedEnd, source.content.length)
+      : fallbackEnd;
+    const citedText = source.content.slice(start, end).trim();
+
+    citations.set(`${source.label}:${start}:${end}`, {
+      sourceId: source.id,
+      label: source.label,
+      title: source.title,
+      marker,
+      start,
+      end,
+      ...(citedText ? { citedText } : {}),
+    });
   }
 
-  return [...labels].flatMap((label) => {
-    const source = byLabel.get(label);
-    return source
-      ? [{ sourceId: source.id, label: source.label, title: source.title }]
-      : [];
-  });
+  return [...citations.values()];
 }

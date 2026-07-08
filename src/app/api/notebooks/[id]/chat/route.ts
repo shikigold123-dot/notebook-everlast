@@ -20,6 +20,20 @@ function labelFor(index: number) {
   return `S-${String(index + 1).padStart(2, "0")}`;
 }
 
+function wantsEventStream(request: Request) {
+  return request.headers.get("accept")?.includes("text/event-stream") ?? false;
+}
+
+function encodeEvent(event: string, data: unknown) {
+  return new TextEncoder().encode(
+    `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+  );
+}
+
+function splitAnswer(answer: string) {
+  return answer.match(/.{1,96}(?:\s|$)/g) ?? [answer];
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -82,6 +96,68 @@ export async function POST(
 
   try {
     await consumeDailyUsage(db, visitorId, "chat");
+  } catch (err) {
+    if (err instanceof UsageLimitExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    throw err;
+  }
+
+  if (wantsEventStream(request)) {
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const userMessage = await createChatMessage(
+            db,
+            notebookId,
+            "user",
+            question
+          );
+          controller.enqueue(encodeEvent("user_message", userMessage));
+
+          const answer = await generateChatAnswer({
+            sources,
+            history,
+            question,
+          });
+          for (const text of splitAnswer(answer)) {
+            controller.enqueue(encodeEvent("delta", { text }));
+          }
+
+          const citations = extractCitations(answer, sources);
+          const assistantMessage = await createChatMessage(
+            db,
+            notebookId,
+            "assistant",
+            answer,
+            citations
+          );
+          controller.enqueue(
+            encodeEvent("assistant_message", assistantMessage)
+          );
+          controller.enqueue(encodeEvent("done", {}));
+        } catch (err) {
+          const message =
+            err instanceof ChatGenerationError
+              ? err.message
+              : "Antwort konnte nicht generiert werden — bitte später nochmal versuchen.";
+          controller.enqueue(encodeEvent("error", { error: message }));
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+      },
+    });
+  }
+
+  try {
     const answer = await generateChatAnswer({
       sources,
       history,
@@ -108,9 +184,6 @@ export async function POST(
       assistantMessage,
     });
   } catch (err) {
-    if (err instanceof UsageLimitExceededError) {
-      return NextResponse.json({ error: err.message }, { status: 429 });
-    }
     if (err instanceof ChatGenerationError) {
       return NextResponse.json({ error: err.message }, { status: 502 });
     }

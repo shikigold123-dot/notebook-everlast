@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import type { ChatCitation } from "@/db/repo/chat";
 import { SourceForm } from "./SourceForm";
 
 export type SourceListItem = {
@@ -39,6 +40,7 @@ export function SourcesPanel({
   notebookId,
   initialSources,
   selectedSourceId = null,
+  selectedCitation = null,
   onSelectSource,
   onSourcesChange,
   readOnly = false,
@@ -46,6 +48,7 @@ export function SourcesPanel({
   notebookId: string;
   initialSources: SourceListItem[];
   selectedSourceId?: string | null;
+  selectedCitation?: ChatCitation | null;
   onSelectSource?: (sourceId: string | null) => void;
   onSourcesChange?: (sources: SourceListItem[]) => void;
   readOnly?: boolean;
@@ -171,6 +174,36 @@ export function SourcesPanel({
   const selectedSource = currentViewer?.source ?? null;
   const viewerError = currentViewer?.error ?? null;
   const viewerBusy = Boolean(selectedSourceId && !currentViewer);
+  const activeCitation =
+    selectedSource &&
+    selectedCitation?.sourceId === selectedSource.id &&
+    typeof selectedCitation.start === "number" &&
+    typeof selectedCitation.end === "number"
+      ? selectedCitation
+      : null;
+
+  function renderSourceContent(source: SourceDetailItem) {
+    const content = source.content ?? "";
+    if (!content.trim()) {
+      return "Für diese Quelle ist noch kein Text verfügbar.";
+    }
+
+    if (!activeCitation) return content;
+
+    const start = Math.max(0, Math.min(activeCitation.start ?? 0, content.length));
+    const end = Math.max(start, Math.min(activeCitation.end ?? start, content.length));
+    if (end <= start) return content;
+
+    return (
+      <>
+        {content.slice(0, start)}
+        <mark className="bg-signal px-0.5 text-ink">
+          {content.slice(start, end)}
+        </mark>
+        {content.slice(end)}
+      </>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -237,10 +270,9 @@ export function SourcesPanel({
                   </a>
                 )}
               </div>
-              <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap border-t-[1.5px] border-ink pt-2 font-sans text-xs leading-5">
-                {selectedSource.content?.trim() ||
-                  "Für diese Quelle ist noch kein Text verfügbar."}
-              </pre>
+              <div className="max-h-80 overflow-y-auto whitespace-pre-wrap border-t-[1.5px] border-ink pt-2 font-sans text-xs leading-5">
+                {renderSourceContent(selectedSource)}
+              </div>
             </div>
           )}
         </section>

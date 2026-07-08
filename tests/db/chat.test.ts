@@ -20,13 +20,29 @@ describe("Chat-Repository", () => {
   it("speichert und listet Nachrichten in Reihenfolge", async () => {
     await createChatMessage(db, notebookId, "user", "Was steht drin?");
     await createChatMessage(db, notebookId, "assistant", "Antwort [S-01]", [
-      { sourceId: "s-1", label: "S-01", title: "Quelle" },
+      {
+        sourceId: "s-1",
+        label: "S-01",
+        title: "Quelle",
+        marker: "[S-01#0-6]",
+        start: 0,
+        end: 6,
+        citedText: "Quelle",
+      },
     ]);
 
     const rows = await listChatMessages(db, notebookId);
     expect(rows.map((row) => row.role)).toEqual(["user", "assistant"]);
     expect(rows[1].citations).toEqual([
-      { sourceId: "s-1", label: "S-01", title: "Quelle" },
+      {
+        sourceId: "s-1",
+        label: "S-01",
+        title: "Quelle",
+        marker: "[S-01#0-6]",
+        start: 0,
+        end: 6,
+        citedText: "Quelle",
+      },
     ]);
   });
 

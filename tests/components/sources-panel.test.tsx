@@ -94,6 +94,45 @@ describe("SourcesPanel", () => {
     expect(onSelectSource).toHaveBeenCalledWith(null);
   });
 
+  it("markiert die zitierte Textstelle im Viewer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          source: {
+            ...READY,
+            content: "Alpha Beta Gamma",
+            tokenCount: 3,
+            originalUrl: null,
+            blobUrl: null,
+            createdAt: "2026-07-08T10:00:00.000Z",
+          },
+        }),
+      })
+    );
+
+    render(
+      <SourcesPanel
+        notebookId="nb-1"
+        initialSources={[READY]}
+        selectedSourceId="s-1"
+        selectedCitation={{
+          sourceId: "s-1",
+          label: "S-01",
+          title: "Fertig",
+          marker: "[S-01#6-10]",
+          start: 6,
+          end: 10,
+          citedText: "Beta",
+        }}
+      />
+    );
+
+    const mark = await screen.findByText("Beta");
+    expect(mark.tagName).toBe("MARK");
+  });
+
   it("meldet eine Quellen-Auswahl an den Workspace", async () => {
     const onSelectSource = vi.fn();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
+import type { ChatCitation } from "@/db/repo/chat";
 import { SourcesPanel, type SourceListItem } from "./SourcesPanel";
 import { ChatPanel, type ChatMessageItem } from "./ChatPanel";
 import {
@@ -34,9 +35,21 @@ export function NotebookWorkspace({
 }) {
   const [currentSources, setCurrentSources] = useState(sources);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [selectedCitation, setSelectedCitation] =
+    useState<ChatCitation | null>(null);
   const readySourceCount = currentSources.filter(
     (source) => source.status === "ready"
   ).length;
+
+  function handleSelectSource(sourceId: string | null) {
+    setSelectedSourceId(sourceId);
+    setSelectedCitation(null);
+  }
+
+  function handleSelectCitation(sourceId: string, citation?: ChatCitation) {
+    setSelectedSourceId(sourceId);
+    setSelectedCitation(citation ?? null);
+  }
 
   return (
     <div className="flex h-dvh flex-col">
@@ -62,7 +75,8 @@ export function NotebookWorkspace({
             notebookId={notebook.id}
             initialSources={currentSources}
             selectedSourceId={selectedSourceId}
-            onSelectSource={setSelectedSourceId}
+            selectedCitation={selectedCitation}
+            onSelectSource={handleSelectSource}
             onSourcesChange={setCurrentSources}
             readOnly={notebook.isDemo}
           />
@@ -73,7 +87,7 @@ export function NotebookWorkspace({
             notebookId={notebook.id}
             initialMessages={chatMessages}
             readySourceCount={readySourceCount}
-            onSelectSource={setSelectedSourceId}
+            onSelectSource={handleSelectCitation}
             readOnly={notebook.isDemo}
           />
         </Panel>

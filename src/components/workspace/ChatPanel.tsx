@@ -11,6 +11,8 @@ export type ChatMessageItem = {
   citations: ChatCitation[] | null;
 };
 
+type StreamMessage = ChatMessageItem;
+
 function renderAssistantText(
   content: string,
   citations: ChatCitation[] | null,
@@ -18,12 +20,16 @@ function renderAssistantText(
 ) {
   if (!citations || citations.length === 0) return content;
 
-  const byLabel = new Map(citations.map((citation) => [citation.label, citation]));
-  const parts = content.split(/(\[S-\d{2}\])/g);
+  const byMarker = new Map(
+    citations.map((citation) => [
+      citation.marker ?? `[${citation.label}]`,
+      citation,
+    ])
+  );
+  const parts = content.split(/(\[S-\d{2}(?:#\d+-\d+)?\])/g);
 
   return parts.map((part, index) => {
-    const label = part.match(/^\[(S-\d{2})\]$/)?.[1];
-    const citation = label ? byLabel.get(label) : undefined;
+    const citation = byMarker.get(part);
     if (!citation) return <span key={`${part}-${index}`}>{part}</span>;
 
     return (
@@ -33,7 +39,7 @@ function renderAssistantText(
         onClick={() => onSelectCitation(citation)}
         className="mx-1 border-[1.5px] border-ink bg-signal px-1 text-xs text-ink"
       >
-        {part}
+        [{citation.label}]
       </button>
     );
   });
@@ -49,7 +55,7 @@ export function ChatPanel({
   notebookId: string;
   initialMessages: ChatMessageItem[];
   readySourceCount: number;
-  onSelectSource?: (sourceId: string) => void;
+  onSelectSource?: (sourceId: string, citation?: ChatCitation) => void;
   readOnly?: boolean;
 }) {
   const [messages, setMessages] = useState(initialMessages ?? []);
@@ -59,6 +65,88 @@ export function ChatPanel({
   const [selectedCitation, setSelectedCitation] = useState<ChatCitation | null>(
     null
   );
+
+  async function readChatStream(res: Response) {
+    const reader = res.body?.getReader();
+    if (!reader) {
+      setError("Antwort konnte nicht gestreamt werden.");
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    const draftId = `assistant-stream-${Date.now()}`;
+    let buffer = "";
+
+    function upsertAssistantDelta(text: string) {
+      setMessages((prev) => {
+        const exists = prev.some((message) => message.id === draftId);
+        const withDraft = exists
+          ? prev
+          : [
+              ...prev,
+              {
+                id: draftId,
+                role: "assistant" as const,
+                content: "",
+                citations: null,
+              },
+            ];
+
+        return withDraft.map((message) =>
+          message.id === draftId
+            ? { ...message, content: message.content + text }
+            : message
+        );
+      });
+    }
+
+    function replaceAssistant(message: StreamMessage) {
+      setMessages((prev) => {
+        if (prev.some((row) => row.id === draftId)) {
+          return prev.map((row) => (row.id === draftId ? message : row));
+        }
+        return [...prev, message];
+      });
+    }
+
+    function handleBlock(block: string) {
+      const lines = block.split("\n");
+      const event = lines
+        .find((line) => line.startsWith("event: "))
+        ?.slice("event: ".length);
+      const dataText = lines
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => line.slice("data: ".length))
+        .join("\n");
+      const data = dataText ? JSON.parse(dataText) : {};
+
+      if (event === "user_message") {
+        setMessages((prev) => [...prev, data as StreamMessage]);
+      }
+      if (event === "delta") {
+        upsertAssistantDelta(String(data.text ?? ""));
+      }
+      if (event === "assistant_message") {
+        replaceAssistant(data as StreamMessage);
+      }
+      if (event === "error") {
+        setError(String(data.error ?? "Antwort konnte nicht generiert werden."));
+      }
+    }
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split("\n\n");
+      buffer = blocks.pop() ?? "";
+      for (const block of blocks) {
+        if (block.trim()) handleBlock(block);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) handleBlock(buffer);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,14 +161,24 @@ export function ChatPanel({
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/chat`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          accept: "text/event-stream",
+          "content-type": "application/json",
+        },
         body: JSON.stringify({ question: trimmed }),
       });
-      const json = await res.json().catch(() => ({}));
+      const contentType = res.headers?.get?.("content-type") ?? "";
       if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
         setError(json.error ?? "Antwort konnte nicht generiert werden.");
         return;
       }
+      if (contentType.includes("text/event-stream")) {
+        await readChatStream(res);
+        setQuestion("");
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
       setMessages((prev) => [
         ...prev,
         json.userMessage,
@@ -99,7 +197,7 @@ export function ChatPanel({
 
   function handleSelectCitation(citation: ChatCitation) {
     setSelectedCitation(citation);
-    onSelectSource?.(citation.sourceId);
+    onSelectSource?.(citation.sourceId, citation);
   }
 
   return (
@@ -139,9 +237,16 @@ export function ChatPanel({
       </div>
 
       {selectedCitation && (
-        <p className="border-[1.5px] border-ink bg-paper px-2 py-1 text-xs">
-          {selectedCitation.label}: {selectedCitation.title}
-        </p>
+        <div className="border-[1.5px] border-ink bg-paper px-2 py-1 text-xs">
+          <p>
+            {selectedCitation.label}: {selectedCitation.title}
+          </p>
+          {selectedCitation.citedText && (
+            <p className="mt-1 max-h-10 overflow-hidden text-ink/70">
+              {selectedCitation.citedText}
+            </p>
+          )}
+        </div>
       )}
 
       {error && (

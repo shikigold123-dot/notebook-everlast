@@ -6,6 +6,10 @@ export type ChatCitation = {
   sourceId: string;
   label: string;
   title: string;
+  marker?: string;
+  start?: number;
+  end?: number;
+  citedText?: string;
 };
 
 export async function listChatMessages(db: Db, notebookId: string) {

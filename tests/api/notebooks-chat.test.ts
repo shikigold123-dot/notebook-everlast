@@ -62,6 +62,17 @@ function postRequest(body: unknown) {
   });
 }
 
+function streamRequest(body: unknown) {
+  return new Request(`http://localhost/api/notebooks/${notebookId}/chat`, {
+    method: "POST",
+    headers: {
+      accept: "text/event-stream",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 describe("POST /api/notebooks/[id]/chat", () => {
   it("generiert eine Antwort aus ready-Quellen und persistiert beide Nachrichten", async () => {
     const source = await createSource(testDb, notebookId, {
@@ -77,7 +88,15 @@ describe("POST /api/notebooks/[id]/chat", () => {
     const json = await res.json();
     expect(json.assistantMessage.content).toBe("Antwort [S-01]");
     expect(json.assistantMessage.citations).toEqual([
-      { sourceId: source.id, label: "S-01", title: "Quelle" },
+      {
+        sourceId: source.id,
+        label: "S-01",
+        title: "Quelle",
+        marker: "[S-01]",
+        start: 0,
+        end: 11,
+        citedText: "Quellentext",
+      },
     ]);
     expect(generateChatAnswerMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -97,6 +116,26 @@ describe("POST /api/notebooks/[id]/chat", () => {
       "user",
       "assistant",
     ]);
+  });
+
+  it("streamt Chat-Antworten als SSE", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    const res = await POST(streamRequest({ question: "Was steht drin?" }), ctx());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    const body = await res.text();
+    expect(body).toContain("event: user_message");
+    expect(body).toContain("event: delta");
+    expect(body).toContain("Antwort [S-01]");
+    expect(body).toContain("event: assistant_message");
+    expect(body).toContain("event: done");
   });
 
   it("liefert 400 ohne bereite Quellen", async () => {
