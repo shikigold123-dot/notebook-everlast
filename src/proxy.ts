@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { VISITOR_COOKIE, UUID_RE } from "@/lib/visitor";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const existing = request.cookies.get(VISITOR_COOKIE)?.value;
   if (existing && UUID_RE.test(existing)) {
     return NextResponse.next();
