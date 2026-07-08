@@ -32,6 +32,37 @@ npm run db:seed:demo
 
 `npm test` — läuft komplett offline (PGlite statt Neon, keine API-Aufrufe).
 
+Gezielter Kernworkflow-Smoke:
+
+```bash
+npm run smoke
+```
+
+## Deployment (Vercel)
+
+1. Neon-Datenbank in Vercel als `DATABASE_URL` setzen.
+2. `OPENROUTER_API_KEY` setzen; optional `OPENROUTER_MODEL` überschreiben.
+3. Für Uploads `BLOB_READ_WRITE_TOKEN` aus dem Vercel-Blob-Store setzen.
+4. Für Audio-Transkription `OPENAI_API_KEY` setzen.
+5. Für echte MP3-Audio-Overviews optional `ELEVENLABS_API_KEY`,
+   `ELEVENLABS_VOICE_A`, `ELEVENLABS_VOICE_B` setzen.
+6. Vor Deployment lokal prüfen:
+
+```bash
+npm test
+npm run smoke
+npx tsc --noEmit
+npm run lint
+npm run build
+```
+
+7. Nach Migrationen oder Demo-Reset einmal ausführen:
+
+```bash
+npx drizzle-kit migrate
+npm run db:seed:demo
+```
+
 ## Dokumente
 
 - Design-Spec: `docs/superpowers/specs/2026-07-06-everlast-notebooklm-alternative-design.md`

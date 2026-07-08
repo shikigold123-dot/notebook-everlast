@@ -5,8 +5,8 @@
   --color-ground: #e9e9e6;
   --color-ink: #1a1a1a;
   --color-signal: #ffd23f;
-  --font-mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
-  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --radius: 0;
 }
 

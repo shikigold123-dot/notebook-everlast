@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "smoke": "vitest run tests/smoke",
     "db:seed:demo": "node scripts/seed-demo.mjs",
     "test:watch": "vitest"
   },
