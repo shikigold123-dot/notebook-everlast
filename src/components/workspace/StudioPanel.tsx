@@ -217,11 +217,13 @@ export function StudioPanel({
   initialArtifacts,
   initialAudioOverview,
   readySourceCount,
+  readOnly = false,
 }: {
   notebookId: string;
   initialArtifacts: ArtifactListItem[];
   initialAudioOverview: AudioOverviewItem | null;
   readySourceCount: number;
+  readOnly?: boolean;
 }) {
   const [artifacts, setArtifacts] = useState(initialArtifacts ?? []);
   const [audioOverview, setAudioOverview] = useState(initialAudioOverview);
@@ -232,7 +234,9 @@ export function StudioPanel({
 
   const hasReadySources = readySourceCount > 0;
   const audioCanBeRequested =
-    hasReadySources && (!audioOverview || audioOverview.status === "error");
+    hasReadySources &&
+    !readOnly &&
+    (!audioOverview || audioOverview.status === "error");
   const canGenerateAudio = audioCanBeRequested && !audioBusy;
 
   useEffect(() => {
@@ -244,7 +248,7 @@ export function StudioPanel({
   }, []);
 
   async function handleGenerate(type: ArtifactKind) {
-    if (!hasReadySources || busyType) return;
+    if (!hasReadySources || readOnly || busyType) return;
 
     setBusyType(type);
     setError(null);
@@ -376,6 +380,12 @@ export function StudioPanel({
           </p>
         )}
 
+        {readOnly && (
+          <p className="mt-3 text-ink/60">
+            Demo-Dossier ist schreibgeschützt.
+          </p>
+        )}
+
         {audioOverview?.durationS && (
           <p className="label-caps mt-3 text-ink/60">
             Dauer ca. {formatDuration(audioOverview.durationS)}
@@ -402,7 +412,7 @@ export function StudioPanel({
             key={type}
             type="button"
             variant="outline"
-            disabled={!hasReadySources || Boolean(busyType)}
+            disabled={!hasReadySources || readOnly || Boolean(busyType)}
             onClick={() => handleGenerate(type as ArtifactKind)}
             className="min-h-10 px-2 text-left"
           >

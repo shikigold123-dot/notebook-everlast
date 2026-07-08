@@ -48,6 +48,18 @@ describe("SourcesPanel", () => {
     expect(screen.getByText("✓ Bereit")).toBeInTheDocument();
   });
 
+  it("blendet Schreibaktionen im Demo-Modus aus", () => {
+    render(
+      <SourcesPanel notebookId="nb-1" initialSources={[READY]} readOnly />
+    );
+
+    expect(
+      screen.getByText("Demo-Dossier ist schreibgeschützt.")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByText("Löschen")).not.toBeInTheDocument();
+  });
+
   it("öffnet eine Quelle im Viewer", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

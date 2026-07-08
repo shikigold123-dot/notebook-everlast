@@ -41,6 +41,7 @@ export default async function NotebookPage({
       notebook={{
         id: nb.id,
         title: nb.title,
+        isDemo: nb.isDemo,
         number: String(position).padStart(3, "0"),
       }}
       sources={sources.map((s) => ({

@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb } from "../helpers/db";
 import type { Db } from "@/db";
 import { createNotebook } from "@/db/repo/notebooks";
 import { createSource } from "@/db/repo/sources";
 import { listChatMessages } from "@/db/repo/chat";
+import { notebook } from "@/db/schema";
 
 let testDb: Db;
 vi.mock("@/db", () => ({
@@ -120,6 +122,19 @@ describe("POST /api/notebooks/[id]/chat", () => {
       params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it("blockiert Schreibzugriff auf Demo-Dossiers", async () => {
+    await testDb
+      .update(notebook)
+      .set({ isDemo: true })
+      .where(eq(notebook.id, notebookId));
+
+    const res = await POST(postRequest({ question: "?" }), ctx());
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(generateChatAnswerMock).not.toHaveBeenCalled();
   });
 
   it("normalisiert OpenRouter-Fehler", async () => {

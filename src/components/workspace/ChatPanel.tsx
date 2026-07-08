@@ -44,11 +44,13 @@ export function ChatPanel({
   initialMessages,
   readySourceCount,
   onSelectSource,
+  readOnly = false,
 }: {
   notebookId: string;
   initialMessages: ChatMessageItem[];
   readySourceCount: number;
   onSelectSource?: (sourceId: string) => void;
+  readOnly?: boolean;
 }) {
   const [messages, setMessages] = useState(initialMessages ?? []);
   const [question, setQuestion] = useState("");
@@ -60,6 +62,8 @@ export function ChatPanel({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (readOnly) return;
+
     const trimmed = question.trim();
     if (!trimmed || busy) return;
 
@@ -91,6 +95,7 @@ export function ChatPanel({
   }
 
   const hasReadySources = readySourceCount > 0;
+  const canAsk = hasReadySources && !readOnly;
 
   function handleSelectCitation(citation: ChatCitation) {
     setSelectedCitation(citation);
@@ -102,9 +107,11 @@ export function ChatPanel({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <p className="text-sm text-ink/60">
-            {hasReadySources
-              ? "Stell eine Frage zu deinen bereiten Quellen."
-              : "Füge zuerst eine bereite Quelle hinzu."}
+            {readOnly
+              ? "Demo-Dossier ist schreibgeschützt."
+              : hasReadySources
+                ? "Stell eine Frage zu deinen bereiten Quellen."
+                : "Füge zuerst eine bereite Quelle hinzu."}
           </p>
         ) : (
           <ol className="flex flex-col gap-3">
@@ -147,16 +154,18 @@ export function ChatPanel({
         <textarea
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          disabled={!hasReadySources || busy}
+          disabled={!canAsk || busy}
           placeholder={
-            hasReadySources
+            readOnly
+              ? "Demo-Dossier ist schreibgeschützt."
+              : hasReadySources
               ? "Frag deine Quellen ..."
               : "Warte auf eine bereite Quelle ..."
           }
           rows={3}
           className="border-[1.5px] border-ink bg-paper px-3 py-2 text-sm disabled:opacity-40"
         />
-        <ActionButton disabled={!hasReadySources || busy}>
+        <ActionButton disabled={!canAsk || busy}>
           {busy ? "Antwort läuft ..." : "Frage stellen"}
         </ActionButton>
       </form>

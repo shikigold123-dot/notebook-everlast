@@ -21,6 +21,21 @@ describe("ChatPanel", () => {
     expect(screen.getByRole("button", { name: /frage stellen/i })).toBeDisabled();
   });
 
+  it("deaktiviert Eingabe im Demo-Modus", () => {
+    render(
+      <ChatPanel
+        notebookId="nb-1"
+        initialMessages={[]}
+        readySourceCount={1}
+        readOnly
+      />
+    );
+    expect(
+      screen.getByPlaceholderText(/demo-dossier ist schreibgeschützt/i)
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /frage stellen/i })).toBeDisabled();
+  });
+
   it("sendet eine Frage und zeigt die Antwort", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(

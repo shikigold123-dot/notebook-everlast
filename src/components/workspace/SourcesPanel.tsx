@@ -40,11 +40,15 @@ export function SourcesPanel({
   initialSources,
   selectedSourceId = null,
   onSelectSource,
+  onSourcesChange,
+  readOnly = false,
 }: {
   notebookId: string;
   initialSources: SourceListItem[];
   selectedSourceId?: string | null;
   onSelectSource?: (sourceId: string | null) => void;
+  onSourcesChange?: (sources: SourceListItem[]) => void;
+  readOnly?: boolean;
 }) {
   const [sources, setSources] = useState(initialSources);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +58,10 @@ export function SourcesPanel({
     error: string | null;
   } | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    onSourcesChange?.(sources);
+  }, [sources, onSourcesChange]);
 
   useEffect(() => {
     const hasPending = sources.some(
@@ -121,6 +129,8 @@ export function SourcesPanel({
   }, [notebookId, selectedSourceId]);
 
   async function handleRetry(sourceId: string) {
+    if (readOnly) return;
+
     setError(null);
     const res = await fetch(
       `/api/notebooks/${notebookId}/sources/${sourceId}/retry`,
@@ -137,6 +147,8 @@ export function SourcesPanel({
   }
 
   async function handleDelete(sourceId: string) {
+    if (readOnly) return;
+
     setError(null);
     const res = await fetch(
       `/api/notebooks/${notebookId}/sources/${sourceId}`,
@@ -162,10 +174,16 @@ export function SourcesPanel({
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <SourceForm
-        notebookId={notebookId}
-        onCreated={(source) => setSources((prev) => [...prev, source])}
-      />
+      {readOnly ? (
+        <p className="border-b-[1.5px] border-ink pb-3 text-sm text-ink/60">
+          Demo-Dossier ist schreibgeschützt.
+        </p>
+      ) : (
+        <SourceForm
+          notebookId={notebookId}
+          onCreated={(source) => setSources((prev) => [...prev, source])}
+        />
+      )}
 
       {error && (
         <p className="border-[1.5px] border-ink bg-paper px-2 py-1 text-sm">
@@ -253,22 +271,24 @@ export function SourcesPanel({
             </div>
             <div className="mt-1 flex items-center justify-between text-xs text-ink/60">
               <span>{STATUS_LABELS[s.status]}</span>
-              <div className="flex gap-2">
-                {s.status === "error" && (
+              {!readOnly && (
+                <div className="flex gap-2">
+                  {s.status === "error" && (
+                    <button
+                      onClick={() => handleRetry(s.id)}
+                      className="underline"
+                    >
+                      Erneut versuchen
+                    </button>
+                  )}
                   <button
-                    onClick={() => handleRetry(s.id)}
+                    onClick={() => handleDelete(s.id)}
                     className="underline"
                   >
-                    Erneut versuchen
+                    Löschen
                   </button>
-                )}
-                <button
-                  onClick={() => handleDelete(s.id)}
-                  className="underline"
-                >
-                  Löschen
-                </button>
-              </div>
+                </div>
+              )}
             </div>
             {s.status === "error" && s.errorMessage && (
               <p className="mt-1 text-xs text-ink/60">{s.errorMessage}</p>

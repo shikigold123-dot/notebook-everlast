@@ -14,6 +14,7 @@ import {
 export type WorkspaceNotebook = {
   id: string;
   title: string;
+  isDemo: boolean;
   /** Laufende Nummer des Besuchers, z. B. "004" */
   number: string;
 };
@@ -31,8 +32,9 @@ export function NotebookWorkspace({
   artifacts: ArtifactListItem[];
   audioOverview: AudioOverviewItem | null;
 }) {
+  const [currentSources, setCurrentSources] = useState(sources);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
-  const readySourceCount = sources.filter(
+  const readySourceCount = currentSources.filter(
     (source) => source.status === "ready"
   ).length;
 
@@ -42,18 +44,27 @@ export function NotebookWorkspace({
         <Link href="/" className="text-lg font-bold tracking-widest">
           EVERLAST
         </Link>
-        <span className="label-caps">
-          DOSSIER {notebook.number} / {notebook.title.toUpperCase()}
-        </span>
+        <div className="flex items-center gap-2">
+          {notebook.isDemo && (
+            <span className="label-caps border-[1.5px] border-ink px-1.5 py-0.5">
+              DEMO
+            </span>
+          )}
+          <span className="label-caps">
+            DOSSIER {notebook.number} / {notebook.title.toUpperCase()}
+          </span>
+        </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 lg:grid-cols-[280px_1fr_280px]">
-        <Panel label="Quellen" count={sources.length}>
+        <Panel label="Quellen" count={currentSources.length}>
           <SourcesPanel
             notebookId={notebook.id}
-            initialSources={sources}
+            initialSources={currentSources}
             selectedSourceId={selectedSourceId}
             onSelectSource={setSelectedSourceId}
+            onSourcesChange={setCurrentSources}
+            readOnly={notebook.isDemo}
           />
         </Panel>
 
@@ -63,6 +74,7 @@ export function NotebookWorkspace({
             initialMessages={chatMessages}
             readySourceCount={readySourceCount}
             onSelectSource={setSelectedSourceId}
+            readOnly={notebook.isDemo}
           />
         </Panel>
 
@@ -72,6 +84,7 @@ export function NotebookWorkspace({
             initialArtifacts={artifacts}
             initialAudioOverview={audioOverview}
             readySourceCount={readySourceCount}
+            readOnly={notebook.isDemo}
           />
         </Panel>
       </div>

@@ -36,6 +36,26 @@ describe("StudioPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("deaktiviert Generierung im Demo-Modus", () => {
+    render(
+      <StudioPanel
+        notebookId="nb-1"
+        initialArtifacts={[]}
+        initialAudioOverview={null}
+        readySourceCount={1}
+        readOnly
+      />
+    );
+
+    expect(screen.getByRole("button", { name: /lernleitfaden/i })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /audio vorbereiten/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/demo-dossier ist schreibgeschützt/i)
+    ).toBeInTheDocument();
+  });
+
   it("sendet den Artefakt-Typ und zeigt das Ergebnis", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
