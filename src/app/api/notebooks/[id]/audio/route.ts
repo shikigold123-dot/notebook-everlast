@@ -50,7 +50,7 @@ export async function GET(
     );
   }
 
-  const audioOverview = await getLatestAudioOverview(db, notebookId);
+  const audioOverview = await getLatestAudioOverview(db, notebookId, visitorId);
   return NextResponse.json({ audioOverview });
 }
 
@@ -83,7 +83,7 @@ export async function POST(
     );
   }
 
-  const existing = await getLatestAudioOverview(db, notebookId);
+  const existing = await getLatestAudioOverview(db, notebookId, visitorId);
   if (existing && existing.status !== "error") {
     return NextResponse.json(
       { error: "Audio Overview existiert bereits." },
@@ -91,7 +91,7 @@ export async function POST(
     );
   }
 
-  const sources = (await listSources(db, notebookId))
+  const sources = (await listSources(db, notebookId, visitorId))
     .filter((source) => source.status === "ready" && source.content?.trim())
     .map(
       (source, index): ChatSource => ({

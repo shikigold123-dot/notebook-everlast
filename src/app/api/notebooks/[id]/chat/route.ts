@@ -71,7 +71,7 @@ export async function POST(
     );
   }
 
-  const sources = (await listSources(db, notebookId))
+  const sources = (await listSources(db, notebookId, visitorId))
     .filter((source) => source.status === "ready" && source.content?.trim())
     .map(
       (source, index): ChatSource => ({
@@ -89,10 +89,12 @@ export async function POST(
     );
   }
 
-  const history = (await listChatMessages(db, notebookId)).map((message) => ({
-    role: message.role,
-    content: message.content,
-  }));
+  const history = (await listChatMessages(db, notebookId, visitorId)).map(
+    (message) => ({
+      role: message.role,
+      content: message.content,
+    })
+  );
 
   try {
     await consumeDailyUsage(db, visitorId, "chat");

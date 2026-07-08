@@ -31,10 +31,10 @@ export default async function NotebookPage({
   const all = await listNotebooks(db, nb.visitorId);
   const position = all.findIndex((n) => n.id === nb.id) + 1;
 
-  const sources = await listSources(db, nb.id);
-  const chatMessages = await listChatMessages(db, nb.id);
-  const artifacts = await listArtifacts(db, nb.id);
-  const audioOverview = await getLatestAudioOverview(db, nb.id);
+  const sources = await listSources(db, nb.id, visitorId);
+  const chatMessages = await listChatMessages(db, nb.id, visitorId);
+  const artifacts = await listArtifacts(db, nb.id, visitorId);
+  const audioOverview = await getLatestAudioOverview(db, nb.id, visitorId);
 
   return (
     <NotebookWorkspace

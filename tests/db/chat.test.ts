@@ -58,4 +58,17 @@ describe("Chat-Repository", () => {
     const rows = await listChatMessages(db, notebookId);
     expect(rows.map((row) => row.content)).toEqual(["A"]);
   });
+
+  it("filtert optional nach Besucherzugriff", async () => {
+    await createChatMessage(db, notebookId, "user", "A");
+
+    expect(await listChatMessages(db, notebookId, VISITOR)).toHaveLength(1);
+    expect(
+      await listChatMessages(
+        db,
+        notebookId,
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      )
+    ).toEqual([]);
+  });
 });

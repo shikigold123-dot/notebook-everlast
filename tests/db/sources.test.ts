@@ -107,6 +107,20 @@ describe("listSources", () => {
     const rows = await listSources(db, notebookId);
     expect(rows.map((s) => s.title)).toEqual(["Erste", "Zweite"]);
   });
+
+  it("filtert optional nach Besucherzugriff", async () => {
+    await createSource(db, notebookId, {
+      type: "text",
+      title: "Eigene Quelle",
+      content: "A",
+      tokenCount: 1,
+    });
+
+    expect(await listSources(db, notebookId, VISITOR)).toHaveLength(1);
+    expect(
+      await listSources(db, notebookId, "bbbbbbbb-0000-4000-8000-000000000002")
+    ).toEqual([]);
+  });
 });
 
 describe("getSource", () => {
@@ -123,6 +137,23 @@ describe("getSource", () => {
       tokenCount: 1,
     });
     const result = await getSource(db, other.id, src.id);
+    expect(result).toBeNull();
+  });
+
+  it("liefert null, wenn der Besucher keinen Zugriff hat", async () => {
+    const src = await createSource(db, notebookId, {
+      type: "text",
+      title: "X",
+      content: "A",
+      tokenCount: 1,
+    });
+
+    const result = await getSource(
+      db,
+      notebookId,
+      src.id,
+      "bbbbbbbb-0000-4000-8000-000000000002"
+    );
     expect(result).toBeNull();
   });
 });

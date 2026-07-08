@@ -1,5 +1,5 @@
-import { desc, eq } from "drizzle-orm";
-import { audioOverview } from "@/db/schema";
+import { and, desc, eq, or } from "drizzle-orm";
+import { audioOverview, notebook } from "@/db/schema";
 import type { Db } from "@/db";
 
 export type AudioScriptTurn = {
@@ -14,7 +14,31 @@ export type AudioOverviewStatus =
   | "ready"
   | "error";
 
-export async function getLatestAudioOverview(db: Db, notebookId: string) {
+function readableNotebook(visitorId: string) {
+  return or(eq(notebook.visitorId, visitorId), eq(notebook.isDemo, true));
+}
+
+export async function getLatestAudioOverview(
+  db: Db,
+  notebookId: string,
+  visitorId?: string
+) {
+  if (visitorId) {
+    const rows = await db
+      .select({ row: audioOverview })
+      .from(audioOverview)
+      .innerJoin(notebook, eq(audioOverview.notebookId, notebook.id))
+      .where(
+        and(
+          eq(audioOverview.notebookId, notebookId),
+          readableNotebook(visitorId)
+        )
+      )
+      .orderBy(desc(audioOverview.createdAt), desc(audioOverview.id))
+      .limit(1);
+    return rows[0]?.row ?? null;
+  }
+
   const rows = await db
     .select()
     .from(audioOverview)

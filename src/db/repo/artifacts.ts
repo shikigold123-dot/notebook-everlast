@@ -1,5 +1,5 @@
-import { asc, eq } from "drizzle-orm";
-import { artifact } from "@/db/schema";
+import { and, asc, eq, or } from "drizzle-orm";
+import { artifact, notebook } from "@/db/schema";
 import type { Db } from "@/db";
 
 export type ArtifactKind =
@@ -9,7 +9,27 @@ export type ArtifactKind =
   | "briefing"
   | "mindmap";
 
-export async function listArtifacts(db: Db, notebookId: string) {
+function readableNotebook(visitorId: string) {
+  return or(eq(notebook.visitorId, visitorId), eq(notebook.isDemo, true));
+}
+
+export async function listArtifacts(
+  db: Db,
+  notebookId: string,
+  visitorId?: string
+) {
+  if (visitorId) {
+    const rows = await db
+      .select({ row: artifact })
+      .from(artifact)
+      .innerJoin(notebook, eq(artifact.notebookId, notebook.id))
+      .where(
+        and(eq(artifact.notebookId, notebookId), readableNotebook(visitorId))
+      )
+      .orderBy(asc(artifact.createdAt), asc(artifact.id));
+    return rows.map((row) => row.row);
+  }
+
   return db
     .select()
     .from(artifact)

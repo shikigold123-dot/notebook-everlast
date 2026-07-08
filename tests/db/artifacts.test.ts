@@ -44,4 +44,17 @@ describe("Artifact-Repository", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].content).toEqual({ summary: "A" });
   });
+
+  it("filtert optional nach Besucherzugriff", async () => {
+    await createArtifact(db, notebookId, "briefing", { summary: "A" });
+
+    expect(await listArtifacts(db, notebookId, VISITOR)).toHaveLength(1);
+    expect(
+      await listArtifacts(
+        db,
+        notebookId,
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      )
+    ).toEqual([]);
+  });
 });

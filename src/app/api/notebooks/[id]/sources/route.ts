@@ -23,7 +23,7 @@ export async function GET(
   if (!notebook) {
     return NextResponse.json({ sources: [] });
   }
-  const sources = await listSources(db, notebookId);
+  const sources = await listSources(db, notebookId, visitorId);
   return NextResponse.json({ sources });
 }
 

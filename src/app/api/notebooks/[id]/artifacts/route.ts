@@ -57,7 +57,7 @@ export async function GET(
     );
   }
 
-  const artifacts = await listArtifacts(db, notebookId);
+  const artifacts = await listArtifacts(db, notebookId, visitorId);
   return NextResponse.json({ artifacts });
 }
 
@@ -98,7 +98,7 @@ export async function POST(
     );
   }
 
-  const sources = (await listSources(db, notebookId))
+  const sources = (await listSources(db, notebookId, visitorId))
     .filter((source) => source.status === "ready" && source.content?.trim())
     .map(
       (source, index): ChatSource => ({

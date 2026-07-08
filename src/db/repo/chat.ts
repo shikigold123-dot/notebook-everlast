@@ -1,5 +1,5 @@
-import { asc, eq } from "drizzle-orm";
-import { chatMessage } from "@/db/schema";
+import { and, asc, eq, or } from "drizzle-orm";
+import { chatMessage, notebook } from "@/db/schema";
 import type { Db } from "@/db";
 
 export type ChatCitation = {
@@ -12,7 +12,27 @@ export type ChatCitation = {
   citedText?: string;
 };
 
-export async function listChatMessages(db: Db, notebookId: string) {
+function readableNotebook(visitorId: string) {
+  return or(eq(notebook.visitorId, visitorId), eq(notebook.isDemo, true));
+}
+
+export async function listChatMessages(
+  db: Db,
+  notebookId: string,
+  visitorId?: string
+) {
+  if (visitorId) {
+    const rows = await db
+      .select({ row: chatMessage })
+      .from(chatMessage)
+      .innerJoin(notebook, eq(chatMessage.notebookId, notebook.id))
+      .where(
+        and(eq(chatMessage.notebookId, notebookId), readableNotebook(visitorId))
+      )
+      .orderBy(asc(chatMessage.createdAt), asc(chatMessage.id));
+    return rows.map((row) => row.row);
+  }
+
   return db
     .select()
     .from(chatMessage)

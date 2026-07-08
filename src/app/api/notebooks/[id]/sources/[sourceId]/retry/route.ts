@@ -34,7 +34,7 @@ export async function POST(
     );
   }
 
-  const updated = await retrySource(db, notebookId, sourceId);
+  const updated = await retrySource(db, notebookId, sourceId, visitorId);
   if (!updated) {
     return NextResponse.json(
       { error: "Quelle nicht gefunden." },

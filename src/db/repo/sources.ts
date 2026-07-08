@@ -1,5 +1,5 @@
-import { and, asc, count, eq, ne } from "drizzle-orm";
-import { source } from "@/db/schema";
+import { and, asc, count, eq, ne, or } from "drizzle-orm";
+import { notebook, source } from "@/db/schema";
 import type { Db } from "@/db";
 import { LIMITS } from "@/lib/limits";
 import { LimitExceededError } from "./notebooks";
@@ -13,7 +13,25 @@ export type NewSourceInput = {
   blobUrl?: string;
 };
 
-export async function listSources(db: Db, notebookId: string) {
+function readableNotebook(visitorId: string) {
+  return or(eq(notebook.visitorId, visitorId), eq(notebook.isDemo, true));
+}
+
+export async function listSources(
+  db: Db,
+  notebookId: string,
+  visitorId?: string
+) {
+  if (visitorId) {
+    const rows = await db
+      .select({ row: source })
+      .from(source)
+      .innerJoin(notebook, eq(source.notebookId, notebook.id))
+      .where(and(eq(source.notebookId, notebookId), readableNotebook(visitorId)))
+      .orderBy(asc(source.createdAt), asc(source.id));
+    return rows.map((row) => row.row);
+  }
+
   return db
     .select()
     .from(source)
@@ -21,7 +39,28 @@ export async function listSources(db: Db, notebookId: string) {
     .orderBy(asc(source.createdAt), asc(source.id));
 }
 
-export async function getSource(db: Db, notebookId: string, sourceId: string) {
+export async function getSource(
+  db: Db,
+  notebookId: string,
+  sourceId: string,
+  visitorId?: string
+) {
+  if (visitorId) {
+    const rows = await db
+      .select({ row: source })
+      .from(source)
+      .innerJoin(notebook, eq(source.notebookId, notebook.id))
+      .where(
+        and(
+          eq(source.id, sourceId),
+          eq(source.notebookId, notebookId),
+          readableNotebook(visitorId)
+        )
+      )
+      .limit(1);
+    return rows[0]?.row ?? null;
+  }
+
   const rows = await db
     .select()
     .from(source)
@@ -95,8 +134,14 @@ export async function createSource(
 export async function deleteSource(
   db: Db,
   notebookId: string,
-  sourceId: string
+  sourceId: string,
+  visitorId?: string
 ) {
+  if (visitorId) {
+    const existing = await getSource(db, notebookId, sourceId, visitorId);
+    if (!existing) return;
+  }
+
   await db
     .delete(source)
     .where(and(eq(source.id, sourceId), eq(source.notebookId, notebookId)));
@@ -136,8 +181,14 @@ export async function markError(db: Db, sourceId: string, message: string) {
 export async function retrySource(
   db: Db,
   notebookId: string,
-  sourceId: string
+  sourceId: string,
+  visitorId?: string
 ) {
+  if (visitorId) {
+    const existing = await getSource(db, notebookId, sourceId, visitorId);
+    if (!existing) return null;
+  }
+
   const [updated] = await db
     .update(source)
     .set({ status: "pending", errorMessage: null })

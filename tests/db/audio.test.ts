@@ -51,6 +51,21 @@ describe("Audio-Repository", () => {
     expect(latest?.id).toBe(second.id);
   });
 
+  it("filtert optional nach Besucherzugriff", async () => {
+    const created = await createQueuedAudioOverview(db, notebookId);
+
+    expect((await getLatestAudioOverview(db, notebookId, VISITOR))?.id).toBe(
+      created.id
+    );
+    expect(
+      await getLatestAudioOverview(
+        db,
+        notebookId,
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      )
+    ).toBeNull();
+  });
+
   it("speichert Fehler als deutsche Skriptzeile", async () => {
     const created = await createQueuedAudioOverview(db, notebookId);
 

@@ -27,7 +27,7 @@ export async function GET(
     );
   }
 
-  const source = await getSource(db, notebookId, sourceId);
+  const source = await getSource(db, notebookId, sourceId, visitorId);
   if (!source) {
     return NextResponse.json(
       { error: "Quelle nicht gefunden." },
@@ -66,6 +66,6 @@ export async function DELETE(
     );
   }
 
-  await deleteSource(db, notebookId, sourceId);
+  await deleteSource(db, notebookId, sourceId, visitorId);
   return NextResponse.json({ ok: true });
 }
