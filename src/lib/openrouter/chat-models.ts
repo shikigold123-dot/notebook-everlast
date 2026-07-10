@@ -3,13 +3,13 @@ export type OpenRouterChatModelOption = {
   name: string;
 };
 
-export const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash";
+export const DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-flash";
 
 export const CURATED_CHAT_MODELS: OpenRouterChatModelOption[] = [
+  { id: DEFAULT_CHAT_MODEL, name: "DeepSeek V4 Flash" },
   { id: "google/gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite" },
-  { id: DEFAULT_CHAT_MODEL, name: "Gemini 2.5 Flash" },
+  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" },
   { id: "qwen/qwen3.6-flash", name: "Qwen3.6 Flash" },
-  { id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash" },
   { id: "deepseek/deepseek-chat", name: "DeepSeek V3 (Chat)" },
   { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B Instruct" },
 ];

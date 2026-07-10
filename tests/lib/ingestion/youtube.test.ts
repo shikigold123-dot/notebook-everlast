@@ -10,6 +10,7 @@ const { createMock, transcribeAudioFileMock, spawnMock } = vi.hoisted(() => ({
 }));
 vi.mock("youtubei.js", () => ({
   Innertube: { create: (...args: unknown[]) => createMock(...args) },
+  ClientType: { WEB: "WEB", ANDROID: "ANDROID" },
 }));
 vi.mock("node:child_process", () => ({
   spawn: (...args: unknown[]) => spawnMock(...args),
@@ -296,6 +297,56 @@ describe("extractYoutube", () => {
       content: "Audio-Transkript",
       meta: { transcriptSource: "audio-transcription" },
     });
+  });
+
+  it("nutzt den ANDROID-Client als letzten Transkript-Fallback vor der Audio-Transkription", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "<html><body>keine player response hier</body></html>",
+      })
+    );
+
+    createMock.mockImplementation((options?: { client_type?: string }) => {
+      if (options?.client_type === "ANDROID") {
+        return Promise.resolve({
+          getInfo: vi.fn().mockResolvedValue({
+            basic_info: { title: "Nur per ANDROID-Client" },
+            getTranscript: vi.fn().mockResolvedValue({
+              transcript: {
+                content: {
+                  body: {
+                    initial_segments: [
+                      { snippet: "Android-Transkript", start_ms: 0, end_ms: 1000 },
+                    ],
+                  },
+                },
+              },
+            }),
+          }),
+        });
+      }
+      return Promise.resolve({
+        getInfo: vi.fn().mockResolvedValue({
+          basic_info: { title: "WEB-Client-Titel", duration: 60 },
+          captions: { caption_tracks: [] },
+          getTranscript: vi.fn().mockRejectedValue(new Error("Kein Panel")),
+        }),
+      });
+    });
+
+    await expect(
+      extractYoutube("https://www.youtube.com/watch?v=abcdefghijk")
+    ).resolves.toMatchObject({
+      title: "WEB-Client-Titel",
+      content: "Android-Transkript",
+      meta: { transcriptSource: "panel" },
+    });
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({ client_type: "ANDROID" })
+    );
   });
 
   it("transkribiert die YouTube-Audiospur, wenn kein Caption-Track verfügbar ist", async () => {

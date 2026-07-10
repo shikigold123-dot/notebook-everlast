@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { Innertube } from "youtubei.js";
+import { Innertube, ClientType } from "youtubei.js";
 import { transcribeAudioFile } from "./audio";
 import { IngestionError } from "./errors";
 
@@ -399,8 +399,41 @@ async function fetchCaptionTracksFromWatchPage(
     console.warn(`[youtube] Watch-Page-Scrape fehlgeschlagen für ${videoId}:`, err);
     return [];
   }
+}
 
-  return [];
+// Weiterer Fallback für den exakten "Precondition check failed"-Fehler des
+// WEB-Clients (siehe fehlgeschlagener getTranscript()-Aufruf oben): der
+// ANDROID-Client umgeht YouTubes PoToken-A/B-Test für die Transcript-API
+// (bestätigtes Muster aus vergleichbaren Community-Tools, z. B.
+// mcp-server-youtube-transcript). Läuft in einer eigenen, separaten
+// Innertube-Session, damit der normale WEB-Client-Pfad (getInfo/Download)
+// unverändert bleibt.
+async function fetchTranscriptViaAndroidClient(
+  videoId: string
+): Promise<NormalizedSegment[]> {
+  try {
+    const androidYt = await Innertube.create({
+      client_type: ClientType.ANDROID,
+      retrieve_player: false,
+    });
+    const info = (await androidYt.getInfo(videoId)) as unknown as YoutubeInfo;
+    const transcriptInfo = await info.getTranscript();
+    const segments = normalizePanelSegments(
+      transcriptInfo.transcript.content?.body?.initial_segments ?? []
+    );
+    if (segments.length === 0) {
+      console.warn(
+        `[youtube] ANDROID-Client lieferte 0 Transkript-Segmente für ${videoId}`
+      );
+    }
+    return segments;
+  } catch (err) {
+    console.warn(
+      `[youtube] ANDROID-Client-Transkript fehlgeschlagen für ${videoId}:`,
+      err
+    );
+    return [];
+  }
 }
 
 function buildResult(
@@ -675,6 +708,11 @@ export async function extractYoutube(
     if (segments.length > 0) {
       return buildResult(info.basic_info.title ?? url, segments, "caption-track");
     }
+  }
+
+  segments = await fetchTranscriptViaAndroidClient(videoId);
+  if (segments.length > 0) {
+    return buildResult(info.basic_info.title ?? url, segments, "panel");
   }
 
   const audioResult = await transcribeYoutubeAudio(info, url);
