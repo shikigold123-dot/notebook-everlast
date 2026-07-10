@@ -75,6 +75,38 @@ describe("POST /api/notebooks/[id]/local-upload", () => {
     expect(json.pathname).toMatch(/^\/uploads\/.+\/.+\.pdf$/);
   });
 
+  it("ignoriert eine bösartige Dateiendung im Namen und speichert trotzdem als .pdf", async () => {
+    await mkdir(path.join(process.cwd(), "public", "uploads"), {
+      recursive: true,
+    });
+    // Angreifer gibt application/pdf als MIME-Type vor, nennt die Datei aber
+    // "evil.html" — die gespeicherte Endung darf trotzdem nicht ".html" sein
+    // (Stored-XSS via same-origin HTML-Ausgabe unter /uploads).
+    const file = new File(["<script>alert(1)</script>"], "evil.html", {
+      type: "application/pdf",
+    });
+
+    const res = await POST(uploadRequest(file), ctx());
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.pathname).toMatch(/\.pdf$/);
+    expect(json.pathname).not.toMatch(/\.html$/);
+  });
+
+  it("leitet die Audio-Endung aus dem validierten MIME-Type ab, nicht aus dem Dateinamen", async () => {
+    await mkdir(path.join(process.cwd(), "public", "uploads"), {
+      recursive: true,
+    });
+    const file = new File(["RIFF"], "evil.svg", { type: "audio/wav" });
+
+    const res = await POST(uploadRequest(file, "audio"), ctx());
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.pathname).toMatch(/\.wav$/);
+  });
+
   it("blockiert Demo-Dossiers", async () => {
     await testDb
       .update(notebook)

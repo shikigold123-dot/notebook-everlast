@@ -13,9 +13,22 @@ import { readVisitorId } from "@/lib/visitor";
 
 const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads");
 
-function fileExtension(filename: string, fallback: string) {
-  const ext = path.extname(filename).toLowerCase().replace(/[^a-z0-9.]/g, "");
-  return ext || fallback;
+// Sicherheitskritisch: Die gespeicherte Dateiendung darf NIE aus dem
+// nutzergesteuerten `file.name` stammen (Stored-XSS via z. B. "evil.html" mit
+// vorgetäuschtem application/pdf-MIME-Type). Sie wird ausschließlich aus dem
+// bereits validierten `type`/MIME ermittelt — unabhängig davon, welcher Zweig
+// von `isAllowedFile` die Datei akzeptiert hat.
+const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
+  "audio/mpeg": ".mp3",
+  "audio/mp4": ".m4a",
+  "audio/wav": ".wav",
+  "audio/x-m4a": ".m4a",
+  "audio/webm": ".webm",
+};
+
+function safeExtensionFor(type: "pdf" | "audio", mimeType: string) {
+  if (type === "pdf") return ".pdf";
+  return AUDIO_EXTENSION_BY_MIME[mimeType] ?? ".mp3";
 }
 
 function isAllowedFile(file: File, type: "pdf" | "audio") {
@@ -85,7 +98,7 @@ export async function POST(
     );
   }
 
-  const ext = fileExtension(file.name, type === "pdf" ? ".pdf" : ".mp3");
+  const ext = safeExtensionFor(type, file.type);
   const dir = path.join(UPLOAD_ROOT, notebookId);
   const filename = `${randomUUID()}${ext}`;
   const target = path.join(dir, filename);
