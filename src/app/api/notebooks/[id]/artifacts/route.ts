@@ -3,11 +3,11 @@ import { cookies } from "next/headers";
 import { getDb } from "@/db";
 import {
   createArtifact,
+  createArtifactError,
   listArtifacts,
   type ArtifactKind,
 } from "@/db/repo/artifacts";
 import { getNotebook } from "@/db/repo/notebooks";
-import { listSources } from "@/db/repo/sources";
 import { readVisitorId } from "@/lib/visitor";
 import {
   consumeDailyUsage,
@@ -16,8 +16,11 @@ import {
 import {
   ArtifactGenerationError,
   generateArtifactContent,
+  isVisualStyleKey,
+  type ArtifactCustomization,
 } from "@/lib/artifacts/openrouter";
-import type { ChatSource } from "@/lib/chat/openrouter";
+import { isDetailLevel, sanitizeText } from "@/lib/generation/customization";
+import { buildNotebookAiContext } from "@/lib/sources/ai-context";
 
 const ARTIFACT_TYPES = [
   "study_guide",
@@ -25,6 +28,14 @@ const ARTIFACT_TYPES = [
   "timeline",
   "briefing",
   "mindmap",
+  "video_overview",
+  "presentation",
+  "flashcards",
+  "quiz",
+  "infographic",
+  "website",
+  "data_table",
+  "glossary",
 ] as const;
 
 function isArtifactKind(value: unknown): value is ArtifactKind {
@@ -32,10 +43,6 @@ function isArtifactKind(value: unknown): value is ArtifactKind {
     typeof value === "string" &&
     ARTIFACT_TYPES.includes(value as ArtifactKind)
   );
-}
-
-function labelFor(index: number) {
-  return `S-${String(index + 1).padStart(2, "0")}`;
 }
 
 export async function GET(
@@ -52,7 +59,7 @@ export async function GET(
   const notebook = await getNotebook(db, visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
@@ -78,14 +85,14 @@ export async function POST(
   const notebook = await getNotebook(db, visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
 
   if (notebook.isDemo) {
     return NextResponse.json(
-      { error: "Demo-Dossier ist schreibgeschützt." },
+      { error: "Demo-Notebook ist schreibgeschützt." },
       { status: 403 }
     );
   }
@@ -98,29 +105,37 @@ export async function POST(
     );
   }
 
-  const sources = (await listSources(db, notebookId, visitorId))
-    .filter((source) => source.status === "ready" && source.content?.trim())
-    .map(
-      (source, index): ChatSource => ({
-        id: source.id,
-        label: labelFor(index),
-        title: source.title,
-        content: source.content ?? "",
-      })
-    );
+  const sources = await buildNotebookAiContext({
+    db,
+    notebookId,
+    visitorId,
+    sourceIds: body.sourceIds,
+    noteIds: body.noteIds,
+  });
 
   if (sources.length === 0) {
     return NextResponse.json(
-      { error: "Füge zuerst eine bereite Quelle hinzu." },
+      { error: "Wähle mindestens eine bereite Quelle oder Notiz aus." },
       { status: 400 }
     );
   }
+
+  const customization: ArtifactCustomization = {
+    ...(isDetailLevel(body.detailLevel) ? { detailLevel: body.detailLevel } : {}),
+    ...(sanitizeText(body.customInstructions, 400)
+      ? { customInstructions: sanitizeText(body.customInstructions, 400) }
+      : {}),
+    ...(body.type === "infographic" && isVisualStyleKey(body.visualStyle)
+      ? { visualStyle: body.visualStyle }
+      : {}),
+  };
 
   try {
     await consumeDailyUsage(db, visitorId, "artifact");
     const content = await generateArtifactContent({
       type: body.type,
       sources,
+      ...(Object.keys(customization).length > 0 ? { customization } : {}),
     });
     const artifact = await createArtifact(db, notebookId, body.type, content);
 
@@ -130,7 +145,16 @@ export async function POST(
       return NextResponse.json({ error: err.message }, { status: 429 });
     }
     if (err instanceof ArtifactGenerationError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
+      const artifact = await createArtifactError(
+        db,
+        notebookId,
+        body.type,
+        err.message
+      );
+      return NextResponse.json(
+        { error: err.message, artifact },
+        { status: 502 }
+      );
     }
     throw err;
   }

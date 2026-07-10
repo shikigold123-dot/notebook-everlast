@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { readVisitorId, UUID_RE } from "@/lib/visitor";
 import {
-  getLatestAudioOverview,
+  listAudioOverviews,
   type AudioScriptTurn,
 } from "@/db/repo/audio";
 import { getNotebook, listNotebooks } from "@/db/repo/notebooks";
 import { listArtifacts } from "@/db/repo/artifacts";
 import { listChatMessages, type ChatCitation } from "@/db/repo/chat";
 import { listSources } from "@/db/repo/sources";
+import { listNotes } from "@/db/repo/notes";
 import { NotebookWorkspace } from "@/components/workspace/NotebookWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,8 @@ export default async function NotebookPage({
   const sources = await listSources(db, nb.id, visitorId);
   const chatMessages = await listChatMessages(db, nb.id, visitorId);
   const artifacts = await listArtifacts(db, nb.id, visitorId);
-  const audioOverview = await getLatestAudioOverview(db, nb.id, visitorId);
+  const audioOverviews = await listAudioOverviews(db, nb.id, visitorId);
+  const notes = await listNotes(db, nb.id, visitorId);
 
   return (
     <NotebookWorkspace
@@ -50,6 +52,8 @@ export default async function NotebookPage({
         status: s.status,
         title: s.title,
         errorMessage: s.errorMessage,
+        originalUrl: s.originalUrl,
+        meta: s.meta,
       }))}
       chatMessages={chatMessages.map((message) => ({
         id: message.id,
@@ -64,18 +68,21 @@ export default async function NotebookPage({
         content: item.content,
         createdAt: item.createdAt.toISOString(),
       }))}
-      audioOverview={
-        audioOverview
-          ? {
-              id: audioOverview.id,
-              status: audioOverview.status,
-              script: (audioOverview.script as AudioScriptTurn[] | null) ?? null,
-              audioBlobUrl: audioOverview.audioBlobUrl,
-              durationS: audioOverview.durationS,
-              createdAt: audioOverview.createdAt.toISOString(),
-            }
-          : null
-      }
+      audioOverviews={audioOverviews.map((audioOverview) => ({
+        id: audioOverview.id,
+        status: audioOverview.status,
+        script: (audioOverview.script as AudioScriptTurn[] | null) ?? null,
+        audioBlobUrl: audioOverview.audioBlobUrl,
+        durationS: audioOverview.durationS,
+        createdAt: audioOverview.createdAt.toISOString(),
+      }))}
+      notes={notes.map((note) => ({
+        id: note.id,
+        title: note.title,
+        content: note.content,
+        createdAt: note.createdAt.toISOString(),
+        updatedAt: note.updatedAt.toISOString(),
+      }))}
     />
   );
 }

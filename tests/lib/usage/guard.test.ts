@@ -18,12 +18,14 @@ beforeEach(async () => {
   db = (await createTestDb()) as unknown as Db;
   delete process.env.LIMIT_CHAT_PER_VISITOR_DAY;
   delete process.env.LIMIT_AUDIO_GLOBAL_DAY;
+  delete process.env.LIMIT_RESEARCH_PER_VISITOR_DAY;
   delete process.env.DAILY_BUDGET_CENTS;
 });
 
 afterEach(() => {
   delete process.env.LIMIT_CHAT_PER_VISITOR_DAY;
   delete process.env.LIMIT_AUDIO_GLOBAL_DAY;
+  delete process.env.LIMIT_RESEARCH_PER_VISITOR_DAY;
   delete process.env.DAILY_BUDGET_CENTS;
 });
 
@@ -38,13 +40,13 @@ describe("Usage-Guard", () => {
     );
   });
 
-  it("setzt Audio zusätzlich gegen das globale Tageslimit", async () => {
+  it("setzt Audio nicht gegen ein Limit", async () => {
     process.env.LIMIT_AUDIO_GLOBAL_DAY = "1";
 
-    await consumeDailyUsage(db, VISITOR, "audio");
+    await expect(consumeDailyUsage(db, VISITOR, "audio")).resolves.toBeDefined();
     await expect(
       consumeDailyUsage(db, "bbbbbbbb-0000-4000-8000-000000000002", "audio")
-    ).rejects.toThrow("Globales Tageslimit erreicht");
+    ).resolves.toBeDefined();
   });
 
   it("blockiert bei erreichtem globalen Tagesbudget", async () => {
@@ -53,6 +55,15 @@ describe("Usage-Guard", () => {
 
     await expect(consumeDailyUsage(db, VISITOR, "chat")).rejects.toThrow(
       "globale Tagesbudget"
+    );
+  });
+
+  it("limitiert Deep Research pro Besucher und Tag", async () => {
+    process.env.LIMIT_RESEARCH_PER_VISITOR_DAY = "1";
+
+    await expect(consumeDailyUsage(db, VISITOR, "research")).resolves.toBe(1);
+    await expect(consumeDailyUsage(db, VISITOR, "research")).rejects.toThrow(
+      "Deep Researches"
     );
   });
 

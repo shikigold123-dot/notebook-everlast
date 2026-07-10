@@ -10,7 +10,6 @@ import {
   markAudioSynthesizing,
 } from "@/db/repo/audio";
 import { getNotebook } from "@/db/repo/notebooks";
-import { listSources } from "@/db/repo/sources";
 import { readVisitorId } from "@/lib/visitor";
 import {
   consumeDailyUsage,
@@ -19,16 +18,31 @@ import {
 import {
   AudioGenerationError,
   generateAudioScript,
+  type AudioCustomization,
 } from "@/lib/audio/openrouter";
 import {
   AudioSynthesisError,
   isAudioTtsConfigured,
   synthesizeAudioOverview,
 } from "@/lib/audio/tts";
-import type { ChatSource } from "@/lib/chat/openrouter";
+import type { AudioScriptTurn } from "@/db/repo/audio";
+import { isDetailLevel, sanitizeText } from "@/lib/generation/customization";
+import { buildNotebookAiContext } from "@/lib/sources/ai-context";
 
-function labelFor(index: number) {
-  return `S-${String(index + 1).padStart(2, "0")}`;
+function isAudioScriptTurn(value: unknown): value is AudioScriptTurn {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      ((value as { speaker?: unknown }).speaker === "A" ||
+        (value as { speaker?: unknown }).speaker === "B") &&
+      typeof (value as { text?: unknown }).text === "string" &&
+      (value as { text: string }).text.trim()
+  );
+}
+
+function readAudioScript(value: unknown) {
+  return Array.isArray(value) ? value.filter(isAudioScriptTurn) : [];
 }
 
 export async function GET(
@@ -45,7 +59,7 @@ export async function GET(
   const notebook = await getNotebook(db, visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
@@ -55,7 +69,7 @@ export async function GET(
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: notebookId } = await params;
@@ -71,40 +85,94 @@ export async function POST(
   const notebook = await getNotebook(db, visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
 
   if (notebook.isDemo) {
     return NextResponse.json(
-      { error: "Demo-Dossier ist schreibgeschützt." },
+      { error: "Demo-Notebook ist schreibgeschützt." },
       { status: 403 }
     );
   }
 
   const existing = await getLatestAudioOverview(db, notebookId, visitorId);
-  if (existing && existing.status !== "error") {
+  const existingScript = readAudioScript(existing?.script);
+  if (
+    existing &&
+    existing.status === "script" &&
+    existingScript.length > 0
+  ) {
+    if (!isAudioTtsConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "Audio-Skript ist bereit. Für eine echte TTS-Audiodatei fehlt noch OPENAI_API_KEY oder ElevenLabs-Konfiguration.",
+          audioOverview: existing,
+        },
+        { status: 409 }
+      );
+    }
+
+    try {
+      let audioOverview = await markAudioSynthesizing(db, existing.id);
+      const audio = await synthesizeAudioOverview({
+        notebookId,
+        audioOverviewId: existing.id,
+        script: existingScript,
+      });
+      audioOverview = await markAudioReady(db, existing.id, audio);
+      return NextResponse.json({ audioOverview }, { status: 200 });
+    } catch (err) {
+      if (err instanceof AudioSynthesisError) {
+        const audioOverview = await markAudioError(
+          db,
+          existing.id,
+          err.message,
+          existingScript
+        );
+        return NextResponse.json(
+          { error: err.message, audioOverview },
+          { status: 502 }
+        );
+      }
+      throw err;
+    }
+  }
+
+  if (existing && (existing.status === "queued" || existing.status === "synthesizing")) {
     return NextResponse.json(
-      { error: "Audio Overview existiert bereits." },
+      { error: "Audio-Generierung läuft bereits." },
       { status: 409 }
     );
   }
 
-  const sources = (await listSources(db, notebookId, visitorId))
-    .filter((source) => source.status === "ready" && source.content?.trim())
-    .map(
-      (source, index): ChatSource => ({
-        id: source.id,
-        label: labelFor(index),
-        title: source.title,
-        content: source.content ?? "",
-      })
-    );
+  const body = await request.json().catch(() => ({}));
+  const customization: AudioCustomization = {
+    ...(isDetailLevel(body.detailLevel) ? { detailLevel: body.detailLevel } : {}),
+    ...(sanitizeText(body.customInstructions, 400)
+      ? { customInstructions: sanitizeText(body.customInstructions, 400) }
+      : {}),
+    ...(sanitizeText(body.speakerA, 80)
+      ? { speakerA: sanitizeText(body.speakerA, 80) }
+      : {}),
+    ...(sanitizeText(body.speakerB, 80)
+      ? { speakerB: sanitizeText(body.speakerB, 80) }
+      : {}),
+  };
+
+  const sources = await buildNotebookAiContext({
+    db,
+    notebookId,
+    visitorId,
+    sourceIds: body.sourceIds,
+    noteIds: body.noteIds,
+  });
 
   if (sources.length === 0) {
     return NextResponse.json(
-      { error: "Füge zuerst eine bereite Quelle hinzu." },
+      { error: "Wähle mindestens eine bereite Quelle oder Notiz aus." },
       { status: 400 }
     );
   }
@@ -124,7 +192,10 @@ export async function POST(
     | undefined;
 
   try {
-    generatedScript = await generateAudioScript({ sources });
+    generatedScript = await generateAudioScript({
+      sources,
+      ...(Object.keys(customization).length > 0 ? { customization } : {}),
+    });
     let audioOverview = await markAudioScript(db, created.id, generatedScript);
 
     if (isAudioTtsConfigured()) {

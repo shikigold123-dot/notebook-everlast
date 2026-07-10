@@ -56,7 +56,7 @@ describe("listNotebooks", () => {
 });
 
 describe("listVisibleNotebooks", () => {
-  it("liefert eigene Notebooks plus Demo-Dossiers, Demo zuerst", async () => {
+  it("liefert eigene Notebooks plus Demo-Notebooks, Demo zuerst", async () => {
     await createNotebook(db, VISITOR_A, "Eigen");
     await createNotebook(db, VISITOR_B, "Fremd");
     const demo = await createNotebook(db, VISITOR_B, "Demo");

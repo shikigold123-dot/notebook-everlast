@@ -2,7 +2,10 @@ import type { Db } from "@/db";
 import { getUsageValue, incrementUsage, type UsageMetric } from "@/db/repo/usage";
 import { LIMITS } from "@/lib/limits";
 
-type ExpensiveMetric = Extract<UsageMetric, "chat" | "artifact" | "audio">;
+type ExpensiveMetric = Extract<
+  UsageMetric,
+  "chat" | "artifact" | "audio" | "research"
+>;
 
 export class UsageLimitExceededError extends Error {}
 
@@ -10,6 +13,7 @@ const METRIC_LABELS: Record<ExpensiveMetric, string> = {
   chat: "Chat-Nachrichten",
   artifact: "Artefakte",
   audio: "Audio Overviews",
+  research: "Deep Researches",
 };
 
 function dateKey(date = new Date()) {
@@ -27,7 +31,8 @@ export function globalDayScope(date = new Date()) {
 function visitorLimitFor(metric: ExpensiveMetric) {
   if (metric === "chat") return LIMITS.chatPerVisitorDay;
   if (metric === "artifact") return LIMITS.artifactsPerVisitorDay;
-  return LIMITS.audioPerVisitorDay;
+  if (metric === "audio") return LIMITS.audioPerVisitorDay;
+  return LIMITS.researchPerVisitorDay;
 }
 
 async function assertGlobalBudgetOpen(db: Db) {
@@ -69,23 +74,15 @@ export async function consumeDailyUsage(
   await assertGlobalBudgetOpen(db);
 
   const visitorScope = visitorDayScope(visitorId);
-  const visitorLimit = visitorLimitFor(metric);
-  await assertBelowLimit({
-    db,
-    scope: visitorScope,
-    metric,
-    limit: visitorLimit,
-    message: `Tageslimit erreicht: maximal ${visitorLimit} ${METRIC_LABELS[metric]} pro Besucher.`,
-  });
 
-  if (metric === "audio") {
-    const globalLimit = LIMITS.audioGlobalDay;
+  if (metric !== "audio" && metric !== "artifact") {
+    const visitorLimit = visitorLimitFor(metric);
     await assertBelowLimit({
       db,
-      scope: globalDayScope(),
+      scope: visitorScope,
       metric,
-      limit: globalLimit,
-      message: `Globales Tageslimit erreicht: maximal ${globalLimit} Audio Overviews pro Tag.`,
+      limit: visitorLimit,
+      message: `Tageslimit erreicht: maximal ${visitorLimit} ${METRIC_LABELS[metric]} pro Besucher.`,
     });
   }
 

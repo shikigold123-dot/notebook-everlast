@@ -19,7 +19,7 @@ describe("NotebookList", () => {
     vi.unstubAllGlobals();
     push.mockClear();
   });
-  it("nummeriert die Dossiers fortlaufend", () => {
+  it("nummeriert die Notebooks fortlaufend", () => {
     render(<NotebookList notebooks={NOTEBOOKS} />);
     expect(screen.getByText("DOSSIER 001")).toBeInTheDocument();
     expect(screen.getByText("DOSSIER 002")).toBeInTheDocument();
@@ -29,11 +29,11 @@ describe("NotebookList", () => {
   it("zeigt den Anlegen-Button", () => {
     render(<NotebookList notebooks={[]} />);
     expect(
-      screen.getByRole("button", { name: /neues dossier/i })
+      screen.getByRole("button", { name: /neues notebook/i })
     ).toBeInTheDocument();
   });
 
-  it("markiert Demo-Dossiers", () => {
+  it("markiert Demo-Notebooks", () => {
     render(
       <NotebookList
         notebooks={[
@@ -53,23 +53,24 @@ describe("NotebookList", () => {
 
   it("zeigt den Leer-Zustand ohne Notebooks", () => {
     render(<NotebookList notebooks={[]} />);
-    expect(screen.getByText(/noch keine dossiers/i)).toBeInTheDocument();
+    expect(screen.getByText(/noch keine notebooks/i)).toBeInTheDocument();
   });
 
-  it("zeigt bei Verbindungsfehler ein Banner und setzt den Button zurück", async () => {
+  it("zeigt bei Verbindungsfehler ein Banner und lässt erneut absenden zu", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new Error("network down"))
     );
     render(<NotebookList notebooks={[]} />);
-    const button = screen.getByRole("button", { name: /neues dossier/i });
-    await user.click(button);
+    await user.click(screen.getByRole("button", { name: /neues notebook/i }));
+    const submit = screen.getByRole("button", { name: /^erstellen$/i });
+    await user.click(submit);
 
     expect(
       await screen.findByText("Keine Verbindung — bitte nochmal versuchen.")
     ).toBeInTheDocument();
-    expect(button).not.toBeDisabled();
+    expect(submit).not.toBeDisabled();
   });
 
   it("zeigt die Server-Meldung bei 429", async () => {
@@ -79,16 +80,17 @@ describe("NotebookList", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         json: async () => ({
-          error: "Maximal 5 Dossiers pro Besucher — lösch eins, um Platz zu schaffen.",
+          error: "Maximal 5 Notebooks pro Besucher — lösch eins, um Platz zu schaffen.",
         }),
       })
     );
     render(<NotebookList notebooks={[]} />);
-    await user.click(screen.getByRole("button", { name: /neues dossier/i }));
+    await user.click(screen.getByRole("button", { name: /neues notebook/i }));
+    await user.click(screen.getByRole("button", { name: /^erstellen$/i }));
 
     expect(
       await screen.findByText(
-        "Maximal 5 Dossiers pro Besucher — lösch eins, um Platz zu schaffen."
+        "Maximal 5 Notebooks pro Besucher — lösch eins, um Platz zu schaffen."
       )
     ).toBeInTheDocument();
   });
@@ -103,8 +105,52 @@ describe("NotebookList", () => {
       })
     );
     render(<NotebookList notebooks={[]} />);
-    await user.click(screen.getByRole("button", { name: /neues dossier/i }));
+    await user.click(screen.getByRole("button", { name: /neues notebook/i }));
+    await user.click(screen.getByRole("button", { name: /^erstellen$/i }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/notebook/abc"));
+  });
+
+  it("übergibt den eingegebenen Titel beim Erstellen", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ notebook: { id: "abc" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<NotebookList notebooks={[]} />);
+    await user.click(screen.getByRole("button", { name: /neues notebook/i }));
+    await user.type(
+      screen.getByPlaceholderText(/ki-wettlauf/i),
+      "Mein Thema"
+    );
+    await user.click(screen.getByRole("button", { name: /^erstellen$/i }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/notebook/abc"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/notebooks",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ title: "Mein Thema" }),
+      })
+    );
+  });
+
+  it("sendet ohne Titel einen leeren Body", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ notebook: { id: "abc" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<NotebookList notebooks={[]} />);
+    await user.click(screen.getByRole("button", { name: /neues notebook/i }));
+    await user.click(screen.getByRole("button", { name: /^erstellen$/i }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/notebook/abc"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/notebooks",
+      expect.objectContaining({ body: JSON.stringify({}) })
+    );
   });
 });

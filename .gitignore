@@ -43,3 +43,7 @@ next-env.d.ts
 
 # Projekt
 .superpowers/
+/public/uploads/
+
+# lokale Claude-Code-Tooling-Konfiguration (kein App-Code)
+.claude/

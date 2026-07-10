@@ -1,5 +1,6 @@
 import type { AudioScriptTurn } from "@/db/repo/audio";
 import type { ChatSource } from "@/lib/chat/openrouter";
+import type { DetailLevel } from "@/lib/generation/customization";
 
 export class AudioGenerationError extends Error {
   constructor(
@@ -8,6 +9,22 @@ export class AudioGenerationError extends Error {
     super(message);
   }
 }
+
+export type AudioCustomization = {
+  /** Steuert die Ziel-Länge der Folge. */
+  detailLevel?: DetailLevel;
+  customInstructions?: string;
+  speakerA?: string;
+  speakerB?: string;
+};
+
+const AUDIO_LENGTH_TEXT: Record<DetailLevel, string> = {
+  brief: "16 bis 24 Turns, mindestens 380 Wörter, ideal 2 bis 3 Minuten Sprechzeit",
+  standard:
+    "38 bis 52 Turns, mindestens 950 Wörter, mindestens 5 Minuten und ideal 5 bis 7 Minuten Sprechzeit",
+  detailed:
+    "60 bis 80 Turns, mindestens 1500 Wörter, ideal 10 bis 13 Minuten Sprechzeit",
+};
 
 function getApiKey() {
   if (!process.env.OPENROUTER_API_KEY) {
@@ -26,20 +43,31 @@ function sourceBlock(source: ChatSource) {
   return `[${source.label}] ${source.title}\n${source.content}`;
 }
 
-export function buildAudioMessages(sources: ChatSource[]) {
+export function buildAudioMessages(
+  sources: ChatSource[],
+  customization: AudioCustomization = {}
+) {
+  const speakerA = customization.speakerA?.trim() || "eine souveräne Moderatorin";
+  const speakerB = customization.speakerB?.trim() || "ein erklärender Experte";
+  const custom = customization.customInstructions?.trim();
+  const lengthText = AUDIO_LENGTH_TEXT[customization.detailLevel ?? "standard"];
+
   return [
     {
       role: "system",
       content:
-        "Du bist Everlast Audio Studio. Schreibe ein deutsches Podcast-Dialogskript ausschließlich aus den Quellen. " +
-        "Speaker A ist eine neugierige Moderatorin, Speaker B ein erklärender Experte. " +
-        "Antworte ausschließlich mit gültigem JSON, ohne Markdown und ohne Codeblock.",
+        "Du bist Everlast Podcast Studio. Schreibe ein deutsches Podcast-Dialogskript ausschließlich aus den Quellen. " +
+        `Speaker A ist ${speakerA}, Speaker B ist ${speakerB}. ` +
+        "Die Folge soll wie ein echter, ruhiger Wissenspodcast klingen: kurzer Hook, natürliche Übergänge, Rückfragen, Einordnung, Fazit. " +
+        "Antworte ausschließlich mit gültigem JSON, ohne Markdown und ohne Codeblock." +
+        (custom ? ` Zusätzliche Nutzer-Anweisung: "${custom}"` : ""),
     },
     {
       role: "user",
       content:
         'JSON-Schema: {"turns":[{"speaker":"A|B","text":"string"}]}\n' +
-        "Anforderungen: 8 bis 14 Turns, klarer Einstieg, konkrete Quelleninhalte, keine erfundenen Fakten, maximal 4 Minuten Sprechzeit.\n\n" +
+        `Anforderungen: ${lengthText}, ` +
+        "natürlicher Podcast-Dialog, konkrete Quelleninhalte, keine erfundenen Fakten, keine Quellenlabels laut vorlesen.\n\n" +
         `Quellen:\n\n${sources.map(sourceBlock).join("\n\n---\n\n")}`,
     },
   ];
@@ -109,10 +137,18 @@ export function parseAudioScriptJson(raw: string): AudioScriptTurn[] {
   return script;
 }
 
+function maxTokensFor(detailLevel?: DetailLevel) {
+  if (detailLevel === "detailed") return 9500;
+  if (detailLevel === "brief") return 3200;
+  return 6500;
+}
+
 export async function generateAudioScript({
   sources,
+  customization = {},
 }: {
   sources: ChatSource[];
+  customization?: AudioCustomization;
 }) {
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -123,9 +159,9 @@ export async function generateAudioScript({
     },
     body: JSON.stringify({
       model: getModel(),
-      messages: buildAudioMessages(sources),
+      messages: buildAudioMessages(sources, customization),
       response_format: { type: "json_object" },
-      max_tokens: 2400,
+      max_tokens: maxTokensFor(customization.detailLevel),
       temperature: 0.35,
     }),
   });

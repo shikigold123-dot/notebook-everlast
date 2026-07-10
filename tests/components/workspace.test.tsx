@@ -11,14 +11,14 @@ describe("NotebookWorkspace", () => {
     vi.unstubAllGlobals();
   });
 
-  it("zeigt Dossier-Nummer und Titel im Header", () => {
+  it("zeigt Notebook-Nummer und Titel im Header", () => {
     render(
       <NotebookWorkspace
         notebook={NB}
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
-        audioOverview={null}
+        audioOverviews={[]}
       />
     );
     expect(screen.getByText(/DOSSIER 004/)).toBeInTheDocument();
@@ -32,7 +32,7 @@ describe("NotebookWorkspace", () => {
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
-        audioOverview={null}
+        audioOverviews={[]}
       />
     );
     expect(screen.getByText("Quellen")).toBeInTheDocument();
@@ -40,14 +40,14 @@ describe("NotebookWorkspace", () => {
     expect(screen.getByText("Studio")).toBeInTheDocument();
   });
 
-  it("kennzeichnet Demo-Dossiers", () => {
+  it("kennzeichnet Demo-Notebooks", () => {
     render(
       <NotebookWorkspace
         notebook={{ ...NB, isDemo: true }}
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
-        audioOverview={null}
+        audioOverviews={[]}
       />
     );
     expect(screen.getByText("DEMO")).toBeInTheDocument();
@@ -60,15 +60,15 @@ describe("NotebookWorkspace", () => {
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
-        audioOverview={null}
+        audioOverviews={[]}
       />
     );
     expect(screen.getByText(/noch keine quellen/i)).toBeInTheDocument();
     expect(
-      screen.getAllByText(/füge zuerst eine bereite quelle hinzu/i)
+      screen.getAllByText(/wähle zuerst eine bereite quelle oder notiz aus/i)
     ).toHaveLength(2);
     expect(
-      screen.getByText(/noch keine studio-artefakte generiert/i)
+      screen.getByText(/noch keine outputs generiert/i)
     ).toBeInTheDocument();
   });
 
@@ -78,7 +78,7 @@ describe("NotebookWorkspace", () => {
         notebook={NB}
         chatMessages={[]}
         artifacts={[]}
-        audioOverview={null}
+        audioOverviews={[]}
         sources={[
           {
             id: "s-1",
@@ -86,12 +86,13 @@ describe("NotebookWorkspace", () => {
             status: "ready",
             title: "Kritik.pdf",
             errorMessage: null,
+            originalUrl: null,
           },
         ]}
       />
     );
     expect(screen.getByText("Kritik.pdf")).toBeInTheDocument();
-    expect(screen.getByText("✓ Bereit")).toBeInTheDocument();
+    expect(screen.getByText("Bereit")).toBeInTheDocument();
   });
 
   it("aktiviert Chat und Studio, wenn eine gepollte Quelle bereit wird", async () => {
@@ -119,7 +120,7 @@ describe("NotebookWorkspace", () => {
         notebook={NB}
         chatMessages={[]}
         artifacts={[]}
-        audioOverview={null}
+        audioOverviews={[]}
         sources={[
           {
             id: "s-1",
@@ -127,13 +128,14 @@ describe("NotebookWorkspace", () => {
             status: "processing",
             title: "Artikel",
             errorMessage: null,
+            originalUrl: null,
           },
         ]}
       />
     );
 
     expect(
-      screen.getByPlaceholderText(/warte auf eine bereite quelle/i)
+      screen.getByPlaceholderText(/wähle eine quelle oder notiz/i)
     ).toBeDisabled();
 
     await act(async () => {
@@ -141,10 +143,10 @@ describe("NotebookWorkspace", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/frag deine quellen/i)).toBeEnabled()
+      expect(screen.getByPlaceholderText(/ausgewählten kontext/i)).toBeEnabled()
     );
     expect(
-      screen.getByRole("button", { name: /lernleitfaden/i })
+      screen.getByRole("button", { name: /präsentation/i })
     ).toBeEnabled();
   });
 });

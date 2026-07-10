@@ -58,3 +58,28 @@ export async function createChatMessage(
     .returning();
   return created;
 }
+
+export async function clearChatMessages(
+  db: Db,
+  notebookId: string,
+  visitorId: string
+) {
+  const [nb] = await db
+    .select()
+    .from(notebook)
+    .where(and(eq(notebook.id, notebookId), eq(notebook.visitorId, visitorId)));
+
+  if (!nb) {
+    return false;
+  }
+
+  if (nb.isDemo) {
+    return false;
+  }
+
+  await db
+    .delete(chatMessage)
+    .where(eq(chatMessage.notebookId, notebookId));
+
+  return true;
+}

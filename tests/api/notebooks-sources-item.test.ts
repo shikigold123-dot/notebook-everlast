@@ -80,7 +80,7 @@ describe("DELETE /api/notebooks/[id]/sources/[sourceId]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("blockiert Löschen in Demo-Dossiers", async () => {
+  it("blockiert Löschen in Demo-Notebooks", async () => {
     await testDb
       .update(notebook)
       .set({ isDemo: true })
@@ -92,7 +92,7 @@ describe("DELETE /api/notebooks/[id]/sources/[sourceId]", () => {
     );
     expect(res.status).toBe(403);
     const json = await res.json();
-    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(json.error).toBe("Demo-Notebook ist schreibgeschützt.");
     const remaining = await getSource(testDb, notebookId, sourceId);
     expect(remaining).not.toBeNull();
   });
@@ -167,7 +167,7 @@ describe("POST /api/notebooks/[id]/sources/[sourceId]/retry", () => {
     expect(res.status).toBe(404);
   });
 
-  it("blockiert Retry in Demo-Dossiers", async () => {
+  it("blockiert Retry in Demo-Notebooks", async () => {
     await testDb
       .update(notebook)
       .set({ isDemo: true })
@@ -179,7 +179,7 @@ describe("POST /api/notebooks/[id]/sources/[sourceId]/retry", () => {
     );
     expect(res.status).toBe(403);
     const json = await res.json();
-    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(json.error).toBe("Demo-Notebook ist schreibgeschützt.");
     expect(processSourceMock).not.toHaveBeenCalled();
   });
 });

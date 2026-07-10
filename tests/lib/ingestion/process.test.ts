@@ -8,6 +8,14 @@ vi.mock("@/lib/ingestion/url", () => ({ extractUrl: vi.fn() }));
 vi.mock("@/lib/ingestion/youtube", () => ({ extractYoutube: vi.fn() }));
 vi.mock("@/lib/ingestion/audio", () => ({ extractAudio: vi.fn() }));
 vi.mock("@/lib/ingestion/tokens", () => ({ countTokens: vi.fn() }));
+vi.mock("@/lib/research/openrouter", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/research/openrouter")>();
+  return { ...actual, generateResearchReport: vi.fn() };
+});
+vi.mock("@/lib/notebook/auto-summary", () => ({
+  writeNotebookAutoSummary: vi.fn(),
+}));
 
 import { extractPdf } from "@/lib/ingestion/pdf";
 import { extractUrl } from "@/lib/ingestion/url";
@@ -15,8 +23,10 @@ import { extractYoutube } from "@/lib/ingestion/youtube";
 import { extractAudio } from "@/lib/ingestion/audio";
 import { countTokens } from "@/lib/ingestion/tokens";
 import { IngestionError } from "@/lib/ingestion/errors";
+import { generateResearchReport } from "@/lib/research/openrouter";
+import { writeNotebookAutoSummary } from "@/lib/notebook/auto-summary";
 import { processSource } from "@/lib/ingestion/process";
-import { createSource, getSource } from "@/db/repo/sources";
+import { createSource, getSource, listSources } from "@/db/repo/sources";
 import { createNotebook } from "@/db/repo/notebooks";
 
 const VISITOR = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -32,6 +42,8 @@ beforeEach(async () => {
   vi.mocked(extractYoutube).mockReset();
   vi.mocked(extractAudio).mockReset();
   vi.mocked(countTokens).mockReset();
+  vi.mocked(generateResearchReport).mockReset();
+  vi.mocked(writeNotebookAutoSummary).mockReset();
   delete process.env.LIMIT_TOKENS_PER_NOTEBOOK;
 });
 
@@ -55,6 +67,7 @@ describe("processSource", () => {
     expect(updated?.content).toBe("Artikeltext.");
     expect(updated?.title).toBe("Echter Titel");
     expect(updated?.tokenCount).toBe(42);
+    expect(writeNotebookAutoSummary).toHaveBeenCalledWith(db, notebookId);
   });
 
   it("setzt eine Quelle auf error mit der IngestionError-Meldung", async () => {
@@ -93,7 +106,7 @@ describe("processSource", () => {
     expect(updated?.errorMessage).toContain("Token-Limit");
   });
 
-  it("setzt eine Quelle auf error, wenn die Dossier-Token-Summe überschritten wird", async () => {
+  it("setzt eine Quelle auf error, wenn die Notebook-Token-Summe überschritten wird", async () => {
     process.env.LIMIT_TOKENS_PER_NOTEBOOK = "10";
     await createSource(db, notebookId, {
       type: "text",
@@ -208,6 +221,57 @@ describe("processSource", () => {
     expect(updated?.content).toBe("Gesprochener Text.");
     expect(updated?.meta).toEqual({ duration_s: 42 });
     expect(updated?.title).toBe("Aufnahme.mp3"); // Audio liefert keinen Titel, Original bleibt
+  });
+
+  it("setzt eine Recherche-Quelle auf ready mit Report, Titel und Meta", async () => {
+    const src = await createSource(db, notebookId, {
+      type: "research",
+      title: "Recherche: Marktanalyse",
+      meta: { query: "Marktanalyse" },
+    });
+    vi.mocked(generateResearchReport).mockResolvedValue({
+      title: "Marktanalyse 2026",
+      content: "Recherchebericht mit Quellen.",
+      meta: {
+        query: "Marktanalyse",
+        model: "perplexity/sonar-deep-research",
+        citations: ["https://example.com"],
+        foundSources: [{ url: "https://example.com", title: "Example" }],
+        annotations: null,
+      },
+    });
+    vi.mocked(extractUrl).mockResolvedValue({
+      title: "Example",
+      content: "Importierter Artikel.",
+    });
+    vi.mocked(countTokens).mockResolvedValue(11);
+
+    await processSource(db, notebookId, src.id);
+
+    const updated = await getSource(db, notebookId, src.id);
+    const sources = await listSources(db, notebookId);
+    expect(generateResearchReport).toHaveBeenCalledWith({
+      query: "Marktanalyse",
+    });
+    expect(updated?.status).toBe("ready");
+    expect(updated?.title).toBe("Marktanalyse 2026");
+    expect(updated?.content).toBe("Recherchebericht mit Quellen.");
+    expect(updated?.meta).toEqual({
+      query: "Marktanalyse",
+      model: "perplexity/sonar-deep-research",
+      citations: ["https://example.com"],
+      foundSources: [{ url: "https://example.com", title: "Example" }],
+      annotations: null,
+    });
+    expect(
+      sources.some(
+        (source) =>
+          source.type === "url" &&
+          source.status === "ready" &&
+          source.originalUrl === "https://example.com/" &&
+          source.title === "Example"
+      )
+    ).toBe(true);
   });
 
   it("setzt eine Text-Quelle auf error, falls sie doch durch processSource läuft (defensiver Fallback)", async () => {

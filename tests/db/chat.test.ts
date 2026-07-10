@@ -46,7 +46,7 @@ describe("Chat-Repository", () => {
     ]);
   });
 
-  it("liefert keine Nachrichten aus anderen Dossiers", async () => {
+  it("liefert keine Nachrichten aus anderen Notebooks", async () => {
     const other = await createNotebook(
       db,
       "bbbbbbbb-0000-4000-8000-000000000002",

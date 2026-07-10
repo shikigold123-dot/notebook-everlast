@@ -3,11 +3,16 @@ import { cookies } from "next/headers";
 import { getDb } from "@/db";
 import { readVisitorId } from "@/lib/visitor";
 import { getNotebook, LimitExceededError } from "@/db/repo/notebooks";
-import { createSource, listSources } from "@/db/repo/sources";
+import { createSource, deleteSource, listSources } from "@/db/repo/sources";
 import { countTokens } from "@/lib/ingestion/tokens";
 import { processSource } from "@/lib/ingestion/process";
+import { writeNotebookAutoSummary } from "@/lib/notebook/auto-summary";
+import {
+  consumeDailyUsage,
+  UsageLimitExceededError,
+} from "@/lib/usage/guard";
 
-const KNOWN_TYPES = ["text", "pdf", "url", "youtube", "audio"];
+const KNOWN_TYPES = ["text", "pdf", "url", "youtube", "audio", "research"];
 
 export async function GET(
   request: Request,
@@ -44,13 +49,13 @@ export async function POST(
   const notebook = await getNotebook(db, visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
   if (notebook.isDemo) {
     return NextResponse.json(
-      { error: "Demo-Dossier ist schreibgeschützt." },
+      { error: "Demo-Notebook ist schreibgeschützt." },
       { status: 403 }
     );
   }
@@ -85,6 +90,9 @@ export async function POST(
         content,
         tokenCount,
       });
+      after(() =>
+        writeNotebookAutoSummary(getDb(), notebookId).catch(() => undefined)
+      );
       return NextResponse.json({ source: created }, { status: 201 });
     }
 
@@ -102,6 +110,29 @@ export async function POST(
         title: "Wird geladen …",
         originalUrl,
       });
+      after(() => processSource(getDb(), notebookId, created.id));
+      return NextResponse.json({ source: created }, { status: 201 });
+    }
+
+    if (type === "research") {
+      const query = typeof body.query === "string" ? body.query.trim() : "";
+      if (!query) {
+        return NextResponse.json(
+          { error: "Recherchefrage darf nicht leer sein." },
+          { status: 400 }
+        );
+      }
+      const created = await createSource(db, notebookId, {
+        type: "research",
+        title: `Recherche: ${query.slice(0, 120)}`,
+        meta: { query },
+      });
+      try {
+        await consumeDailyUsage(db, visitorId, "research");
+      } catch (err) {
+        await deleteSource(db, notebookId, created.id, visitorId);
+        throw err;
+      }
       after(() => processSource(getDb(), notebookId, created.id));
       return NextResponse.json({ source: created }, { status: 201 });
     }
@@ -125,7 +156,7 @@ export async function POST(
     after(() => processSource(getDb(), notebookId, created.id));
     return NextResponse.json({ source: created }, { status: 201 });
   } catch (err) {
-    if (err instanceof LimitExceededError) {
+    if (err instanceof LimitExceededError || err instanceof UsageLimitExceededError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
     }
     throw err;

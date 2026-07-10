@@ -70,7 +70,7 @@ describe("createSource", () => {
     ).rejects.toThrow(LimitExceededError);
   });
 
-  it("wirft LimitExceededError, wenn Text die Dossier-Token-Summe überschreitet", async () => {
+  it("wirft LimitExceededError, wenn Text die Notebook-Token-Summe überschreitet", async () => {
     process.env.LIMIT_TOKENS_PER_NOTEBOOK = "10";
     await createSource(db, notebookId, {
       type: "text",

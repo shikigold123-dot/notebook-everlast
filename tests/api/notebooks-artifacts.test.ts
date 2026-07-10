@@ -98,11 +98,127 @@ describe("POST /api/notebooks/[id]/artifacts", () => {
     expect(rows[0].status).toBe("ready");
   });
 
+  it("respektiert eine explizit leere Quellenauswahl", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    const res = await POST(postRequest({ type: "faq", sourceIds: [] }), ctx());
+
+    expect(res.status).toBe(400);
+    expect(generateArtifactContentMock).not.toHaveBeenCalled();
+  });
+
+  it("akzeptiert NotebookLM-ähnliche Studio-Typen", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+    generateArtifactContentMock.mockResolvedValue({
+      title: "Quiz",
+      questions: [],
+    });
+
+    const res = await POST(postRequest({ type: "quiz" }), ctx());
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.artifact.type).toBe("quiz");
+    expect(generateArtifactContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "quiz" })
+    );
+  });
+
+  it("akzeptiert Website als neuen Output-Typ", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+    generateArtifactContentMock.mockResolvedValue({
+      title: "Website",
+      html: "<!doctype html><html><body>Hallo</body></html>",
+    });
+
+    const res = await POST(postRequest({ type: "website" }), ctx());
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.artifact.type).toBe("website");
+    expect(generateArtifactContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "website" })
+    );
+  });
+
+  it("reicht Detailgrad, Freitext und visuellen Stil an die Generierung durch", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+    generateArtifactContentMock.mockResolvedValue({
+      title: "Infografik",
+      imageUrl: "https://example.com/bild.png",
+    });
+
+    const res = await POST(
+      postRequest({
+        type: "infographic",
+        detailLevel: "detailed",
+        customInstructions: "Fokus auf Kapitel 2",
+        visualStyle: "sketchnote",
+      }),
+      ctx()
+    );
+
+    expect(res.status).toBe(201);
+    expect(generateArtifactContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "infographic",
+        customization: {
+          detailLevel: "detailed",
+          customInstructions: "Fokus auf Kapitel 2",
+          visualStyle: "sketchnote",
+        },
+      })
+    );
+  });
+
+  it("ignoriert visuellen Stil außerhalb von Infografiken und unbekannte Werte", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    await POST(
+      postRequest({
+        type: "faq",
+        detailLevel: "nicht-echt",
+        visualStyle: "sketchnote",
+      }),
+      ctx()
+    );
+
+    expect(generateArtifactContentMock).toHaveBeenCalledWith({
+      type: "faq",
+      sources: expect.any(Array),
+    });
+  });
+
   it("liefert 400 ohne bereite Quellen", async () => {
     const res = await POST(postRequest({ type: "faq" }), ctx());
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe("Füge zuerst eine bereite Quelle hinzu.");
+    expect(json.error).toBe("Wähle mindestens eine bereite Quelle oder Notiz aus.");
   });
 
   it("liefert 400 bei unbekanntem Typ", async () => {
@@ -116,14 +232,14 @@ describe("POST /api/notebooks/[id]/artifacts", () => {
     expect(res.status).toBe(401);
   });
 
-  it("liefert 404 für ein fremdes Dossier", async () => {
+  it("liefert 404 für ein fremdes Notebook", async () => {
     const res = await POST(postRequest({ type: "faq" }), {
       params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
     });
     expect(res.status).toBe(404);
   });
 
-  it("blockiert Schreibzugriff auf Demo-Dossiers", async () => {
+  it("blockiert Schreibzugriff auf Demo-Notebooks", async () => {
     await testDb
       .update(notebook)
       .set({ isDemo: true })
@@ -132,7 +248,7 @@ describe("POST /api/notebooks/[id]/artifacts", () => {
     const res = await POST(postRequest({ type: "faq" }), ctx());
     expect(res.status).toBe(403);
     const json = await res.json();
-    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(json.error).toBe("Demo-Notebook ist schreibgeschützt.");
   });
 
   it("normalisiert OpenRouter-Fehler", async () => {
@@ -151,9 +267,15 @@ describe("POST /api/notebooks/[id]/artifacts", () => {
     expect(res.status).toBe(502);
     const json = await res.json();
     expect(json.error).toBe("Kaputt");
+    expect(json.artifact.status).toBe("error");
+    expect(json.artifact.content).toEqual({ message: "Kaputt" });
+
+    const rows = await listArtifacts(testDb, notebookId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("error");
   });
 
-  it("liefert 429 ab dem Artefakt-Tageslimit", async () => {
+  it("liefert keinen Fehler 429 bei Überschreitung des Artefakt-Tageslimits", async () => {
     process.env.LIMIT_ARTIFACTS_PER_VISITOR_DAY = "1";
     await createSource(testDb, notebookId, {
       type: "text",
@@ -165,14 +287,12 @@ describe("POST /api/notebooks/[id]/artifacts", () => {
     await POST(postRequest({ type: "faq" }), ctx());
     const res = await POST(postRequest({ type: "briefing" }), ctx());
 
-    expect(res.status).toBe(429);
-    const json = await res.json();
-    expect(json.error).toContain("Tageslimit erreicht");
+    expect(res.status).toBe(201);
   });
 });
 
 describe("GET /api/notebooks/[id]/artifacts", () => {
-  it("listet die Artefakte des Dossiers", async () => {
+  it("listet die Artefakte des Notebooks", async () => {
     await createSource(testDb, notebookId, {
       type: "text",
       title: "Quelle",

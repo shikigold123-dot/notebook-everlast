@@ -31,6 +31,28 @@ describe("buildAudioMessages", () => {
     expect(messages[1].content).toContain('"turns"');
     expect(messages[1].content).toContain("[S-01] Quelle");
   });
+
+  it("nutzt Standard-Rollen und Standard-Länge ohne Customization", () => {
+    const messages = buildAudioMessages(SOURCES);
+    expect(messages[0].content).toContain("eine souveräne Moderatorin");
+    expect(messages[0].content).toContain("ein erklärender Experte");
+    expect(messages[1].content).toContain("38 bis 52 Turns");
+  });
+
+  it("übernimmt eigene Sprecherrollen, Länge und Freitext-Anweisung", () => {
+    const messages = buildAudioMessages(SOURCES, {
+      speakerA: "Skeptikerin",
+      speakerB: "Enthusiast",
+      detailLevel: "brief",
+      customInstructions: "Fokus auf Kapitel 2",
+    });
+    expect(messages[0].content).toContain("Speaker A ist Skeptikerin");
+    expect(messages[0].content).toContain("Speaker B ist Enthusiast");
+    expect(messages[0].content).toContain(
+      'Zusätzliche Nutzer-Anweisung: "Fokus auf Kapitel 2"'
+    );
+    expect(messages[1].content).toContain("16 bis 24 Turns");
+  });
 });
 
 describe("parseAudioScriptJson", () => {

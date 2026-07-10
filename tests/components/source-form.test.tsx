@@ -35,8 +35,10 @@ describe("SourceForm", () => {
     const user = userEvent.setup();
     render(<SourceForm notebookId="nb-1" onCreated={onCreated} />);
 
+    await user.click(screen.getByRole("button", { name: /Text einfügen/i }));
+
     await user.type(
-      screen.getByPlaceholderText("Text einfügen …"),
+      screen.getByPlaceholderText("Text hier einfügen …"),
       "Mein Text"
     );
     await user.click(screen.getByRole("button", { name: "Hinzufügen" }));
@@ -46,7 +48,7 @@ describe("SourceForm", () => {
         expect.objectContaining({ id: "s-1" })
       )
     );
-    expect(screen.getByPlaceholderText("Text einfügen …")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Text hier einfügen …")).toHaveValue("");
   });
 
   it("zeigt eine Fehlermeldung ohne Signalfarbe bei einer 429-Antwort", async () => {
@@ -54,16 +56,18 @@ describe("SourceForm", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: false,
-        json: async () => ({ error: "Maximal 8 Quellen pro Dossier." }),
+        json: async () => ({ error: "Maximal 8 Quellen pro Notebook." }),
       })
     );
     const user = userEvent.setup();
     render(<SourceForm notebookId="nb-1" onCreated={vi.fn()} />);
 
-    await user.type(screen.getByPlaceholderText("Text einfügen …"), "Text");
+    await user.click(screen.getByRole("button", { name: /Text einfügen/i }));
+
+    await user.type(screen.getByPlaceholderText("Text hier einfügen …"), "Text");
     await user.click(screen.getByRole("button", { name: "Hinzufügen" }));
 
-    const banner = await screen.findByText("Maximal 8 Quellen pro Dossier.");
+    const banner = await screen.findByText("Maximal 8 Quellen pro Notebook.");
     expect(banner.className).toContain("bg-paper");
     expect(banner.className).not.toContain("bg-signal");
   });
@@ -88,7 +92,7 @@ describe("SourceForm", () => {
     const user = userEvent.setup();
     render(<SourceForm notebookId="nb-1" onCreated={onCreated} />);
 
-    await user.selectOptions(screen.getByRole("combobox"), "pdf");
+    await user.click(screen.getByRole("button", { name: /PDF-Dokument/i }));
     const file = new File(["%PDF-1.4"], "doku.pdf", {
       type: "application/pdf",
     });
@@ -121,6 +125,114 @@ describe("SourceForm", () => {
     );
   });
 
+  it("nutzt lokalen Upload-Fallback, wenn Vercel Blob nicht konfiguriert ist", async () => {
+    uploadMock.mockRejectedValue(new Error("Blob fehlt"));
+    const onCreated = vi.fn();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          url: "http://localhost:3001/uploads/nb-1/local.pdf",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          source: {
+            id: "s-local",
+            type: "pdf",
+            status: "pending",
+            title: "local.pdf",
+            errorMessage: null,
+          },
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<SourceForm notebookId="nb-1" onCreated={onCreated} />);
+
+    await user.click(screen.getByRole("button", { name: /PDF-Dokument/i }));
+    const file = new File(["%PDF-1.4"], "local.pdf", {
+      type: "application/pdf",
+    });
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    await user.upload(input, file);
+
+    await waitFor(() =>
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "s-local" })
+      )
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/notebooks/nb-1/local-upload",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(FormData),
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/notebooks/nb-1/sources",
+      expect.objectContaining({
+        body: JSON.stringify({
+          type: "pdf",
+          title: "local.pdf",
+          blobUrl: "http://localhost:3001/uploads/nb-1/local.pdf",
+        }),
+      })
+    );
+  });
+
+  it("sendet eine Recherchefrage als neue Quelle", async () => {
+    const onCreated = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        source: {
+          id: "s-3",
+          type: "research",
+          status: "pending",
+          title: "Recherche: NotebookLM",
+          errorMessage: null,
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<SourceForm notebookId="nb-1" onCreated={onCreated} />);
+
+    await user.click(screen.getByRole("button", { name: /Deep Research/i }));
+    await user.type(
+      screen.getByPlaceholderText("Was möchtest du recherchieren?"),
+      "NotebookLM Deep Research"
+    );
+    await user.click(screen.getByRole("button", { name: "Recherchieren" }));
+
+    await waitFor(() =>
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "s-3" })
+      )
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/notebooks/nb-1/sources",
+      expect.objectContaining({
+        body: JSON.stringify({
+          type: "research",
+          query: "NotebookLM Deep Research",
+        }),
+      })
+    );
+    expect(
+      screen.getByPlaceholderText("Was möchtest du recherchieren?")
+    ).toHaveValue("");
+  });
+
   it("lehnt eine zu große PDF-Datei sofort ab, ohne einen Upload zu starten", async () => {
     const oversized = new File(
       [new Uint8Array(16 * 1024 * 1024)],
@@ -130,7 +242,7 @@ describe("SourceForm", () => {
     const user = userEvent.setup();
     render(<SourceForm notebookId="nb-1" onCreated={vi.fn()} />);
 
-    await user.selectOptions(screen.getByRole("combobox"), "pdf");
+    await user.click(screen.getByRole("button", { name: /PDF-Dokument/i }));
     const input = document.querySelector(
       'input[type="file"]'
     ) as HTMLInputElement;

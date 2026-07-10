@@ -42,6 +42,19 @@ describe("buildChatMessages", () => {
     expect(messages[1].content).toContain("[S-02] Zweite Quelle");
     expect(messages.at(-1)).toEqual({ role: "user", content: "Frage?" });
   });
+
+  it("fügt eine Systemanweisung hinzu, ohne die Quellenregeln zu ersetzen", () => {
+    const messages = buildChatMessages(
+      SOURCES,
+      [],
+      "Frage?",
+      "Erkläre Fachbegriffe einfach."
+    );
+
+    expect(messages[0].content).toContain("Erkläre Fachbegriffe einfach.");
+    expect(messages[0].content).toContain("Quellenbindung");
+    expect(messages[0].content).toContain("Belegpflicht");
+  });
 });
 
 describe("generateChatAnswer", () => {
@@ -59,6 +72,7 @@ describe("generateChatAnswer", () => {
       sources: SOURCES,
       history: [],
       question: "Was steht drin?",
+      model: "deepseek/deepseek-v4-flash",
     });
 
     expect(answer).toBe("Antwort [S-01]");
@@ -74,7 +88,7 @@ describe("generateChatAnswer", () => {
     const body = JSON.parse(
       String(vi.mocked(fetch).mock.calls[0][1]?.body)
     );
-    expect(body.model).toBe("test/model");
+    expect(body.model).toBe("deepseek/deepseek-v4-flash");
     expect(body.messages.at(-1)).toEqual({
       role: "user",
       content: "Was steht drin?",
@@ -87,6 +101,27 @@ describe("generateChatAnswer", () => {
     await expect(
       generateChatAnswer({ sources: SOURCES, history: [], question: "?" })
     ).rejects.toThrow(ChatGenerationError);
+  });
+
+  it("fällt bei ungültigem Modell auf OPENROUTER_MODEL zurück", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "Antwort" } }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await generateChatAnswer({
+      sources: SOURCES,
+      history: [],
+      question: "?",
+      model: "kein-modell",
+    });
+
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(body.model).toBe("test/model");
   });
 
   it("wirft eine deutsche Meldung ohne API-Key", async () => {

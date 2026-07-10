@@ -19,12 +19,16 @@
     "@vercel/blob": "^2.5.0",
     "@xyflow/react": "^12.11.2",
     "drizzle-orm": "^0.45.2",
+    "geist": "^1.7.2",
+    "jspdf": "^4.2.1",
     "linkedom": "^0.18.12",
     "next": "16.2.10",
     "openai": "^6.45.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "unpdf": "^1.6.2",
+    "xlsx": "^0.18.5",
+    "youtube-dl-exec": "^3.1.9",
     "youtubei.js": "^17.2.0"
   },
   "devDependencies": {

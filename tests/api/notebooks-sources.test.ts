@@ -36,6 +36,12 @@ vi.mock("@/lib/ingestion/process", () => ({
   processSource: (...args: unknown[]) => processSourceMock(...args),
 }));
 
+const writeNotebookAutoSummaryMock = vi.fn();
+vi.mock("@/lib/notebook/auto-summary", () => ({
+  writeNotebookAutoSummary: (...args: unknown[]) =>
+    writeNotebookAutoSummaryMock(...args),
+}));
+
 import { GET, POST } from "@/app/api/notebooks/[id]/sources/route";
 
 const VISITOR = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -48,8 +54,10 @@ beforeEach(async () => {
   cookieValue = VISITOR;
   countTokensMock.mockReset().mockResolvedValue(10);
   processSourceMock.mockReset().mockResolvedValue(undefined);
+  writeNotebookAutoSummaryMock.mockReset().mockResolvedValue(undefined);
   delete process.env.LIMIT_SOURCES_PER_NOTEBOOK;
   delete process.env.LIMIT_TOKENS_PER_NOTEBOOK;
+  delete process.env.LIMIT_RESEARCH_PER_VISITOR_DAY;
 });
 
 function ctx() {
@@ -75,6 +83,10 @@ describe("POST /api/notebooks/[id]/sources", () => {
     expect(json.source.status).toBe("ready");
     expect(json.source.tokenCount).toBe(10);
     expect(processSourceMock).not.toHaveBeenCalled();
+    expect(writeNotebookAutoSummaryMock).toHaveBeenCalledWith(
+      testDb,
+      notebookId
+    );
   });
 
   it("liefert 400 bei leerem Text", async () => {
@@ -98,6 +110,38 @@ describe("POST /api/notebooks/[id]/sources", () => {
       notebookId,
       json.source.id
     );
+  });
+
+  it("legt eine Recherche-Quelle als pending an und stößt Deep Research an", async () => {
+    const res = await POST(
+      postRequest({ type: "research", query: "NotebookLM Recherchefunktion" }),
+      ctx()
+    );
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.source.status).toBe("pending");
+    expect(json.source.type).toBe("research");
+    expect(json.source.meta).toEqual({ query: "NotebookLM Recherchefunktion" });
+    expect(processSourceMock).toHaveBeenCalledWith(
+      testDb,
+      notebookId,
+      json.source.id
+    );
+  });
+
+  it("liefert 400 bei leerer Recherchefrage", async () => {
+    const res = await POST(postRequest({ type: "research", query: "   " }), ctx());
+    expect(res.status).toBe(400);
+  });
+
+  it("liefert 429 ab dem Recherche-Tageslimit", async () => {
+    process.env.LIMIT_RESEARCH_PER_VISITOR_DAY = "1";
+    await POST(postRequest({ type: "research", query: "Eins" }), ctx());
+    const res = await POST(postRequest({ type: "research", query: "Zwei" }), ctx());
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toContain("Tageslimit");
   });
 
   it("legt eine PDF-Quelle mit blobUrl als pending an", async () => {
@@ -134,14 +178,14 @@ describe("POST /api/notebooks/[id]/sources", () => {
     expect(res.status).toBe(401);
   });
 
-  it("liefert 404 für ein fremdes Dossier", async () => {
+  it("liefert 404 für ein fremdes Notebook", async () => {
     const res = await POST(postRequest({ type: "text", content: "x" }), {
       params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
     });
     expect(res.status).toBe(404);
   });
 
-  it("blockiert Schreibzugriff auf Demo-Dossiers", async () => {
+  it("blockiert Schreibzugriff auf Demo-Notebooks", async () => {
     await testDb
       .update(notebook)
       .set({ isDemo: true })
@@ -150,7 +194,7 @@ describe("POST /api/notebooks/[id]/sources", () => {
     const res = await POST(postRequest({ type: "text", content: "x" }), ctx());
     expect(res.status).toBe(403);
     const json = await res.json();
-    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(json.error).toBe("Demo-Notebook ist schreibgeschützt.");
   });
 
   it("liefert 429 ab dem Quellen-Limit", async () => {
@@ -162,7 +206,7 @@ describe("POST /api/notebooks/[id]/sources", () => {
     expect(json.error).toContain("Maximal 1");
   });
 
-  it("liefert 429, wenn Text die Dossier-Token-Summe überschreitet", async () => {
+  it("liefert 429, wenn Text die Notebook-Token-Summe überschreitet", async () => {
     process.env.LIMIT_TOKENS_PER_NOTEBOOK = "10";
     countTokensMock.mockResolvedValueOnce(6).mockResolvedValueOnce(5);
 
@@ -176,7 +220,7 @@ describe("POST /api/notebooks/[id]/sources", () => {
 });
 
 describe("GET /api/notebooks/[id]/sources", () => {
-  it("listet die Quellen des Dossiers", async () => {
+  it("listet die Quellen des Notebooks", async () => {
     await POST(postRequest({ type: "text", content: "Eins" }), ctx());
     const res = await GET(new Request("http://localhost"), ctx());
     expect(res.status).toBe(200);

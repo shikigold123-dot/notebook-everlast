@@ -13,8 +13,8 @@ export default defineConfig({
     // Der Kaltstart passiert meist in beforeEach (createTestDb()), das unter
     // hookTimeout läuft — nicht testTimeout. Beide müssen angehoben werden,
     // sonst flakt weiterhin trotz erhöhtem testTimeout (siehe Tasks 4/7/8).
-    testTimeout: 20000,
-    hookTimeout: 20000,
+    testTimeout: 60000,
+    hookTimeout: 60000,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

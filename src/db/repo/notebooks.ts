@@ -38,7 +38,7 @@ export async function createNotebook(
 
   if (existing >= LIMITS.notebooksPerVisitor) {
     throw new LimitExceededError(
-      `Maximal ${LIMITS.notebooksPerVisitor} Dossiers pro Besucher — lösch eins, um Platz zu schaffen.`
+      `Maximal ${LIMITS.notebooksPerVisitor} Notebooks pro Besucher — lösch eins, um Platz zu schaffen.`
     );
   }
 
@@ -61,4 +61,12 @@ export async function getNotebook(db: Db, visitorId: string, id: string) {
     )
     .limit(1);
   return rows[0] ?? null;
+}
+
+export async function deleteNotebook(db: Db, visitorId: string, id: string) {
+  const result = await db
+    .delete(notebook)
+    .where(and(eq(notebook.id, id), eq(notebook.visitorId, visitorId)))
+    .returning();
+  return result[0] ?? null;
 }

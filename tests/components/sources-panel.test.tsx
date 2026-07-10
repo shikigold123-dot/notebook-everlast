@@ -11,6 +11,7 @@ const PENDING: SourceListItem = {
   status: "pending",
   title: "Warten …",
   errorMessage: null,
+  originalUrl: null,
 };
 
 const READY: SourceListItem = {
@@ -19,6 +20,7 @@ const READY: SourceListItem = {
   status: "ready",
   title: "Fertig",
   errorMessage: null,
+  originalUrl: null,
 };
 
 beforeEach(() => {
@@ -45,7 +47,7 @@ describe("SourcesPanel", () => {
   it("zeigt den Status einer Quelle", () => {
     render(<SourcesPanel notebookId="nb-1" initialSources={[READY]} />);
     expect(screen.getByText("Fertig")).toBeInTheDocument();
-    expect(screen.getByText("✓ Bereit")).toBeInTheDocument();
+    expect(screen.getByText("Bereit")).toBeInTheDocument();
   });
 
   it("blendet Schreibaktionen im Demo-Modus aus", () => {
@@ -54,7 +56,7 @@ describe("SourcesPanel", () => {
     );
 
     expect(
-      screen.getByText("Demo-Dossier ist schreibgeschützt.")
+      screen.getByText("Demo-Notebook ist schreibgeschützt.")
     ).toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByText("Löschen")).not.toBeInTheDocument();
@@ -163,7 +165,7 @@ describe("SourcesPanel", () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("✓ Bereit")).toBeInTheDocument();
+    expect(screen.getByText("Bereit")).toBeInTheDocument();
 
     // Weitere 2s: darf NICHT nochmal abfragen, da jetzt alles ready ist
     await act(async () => {
@@ -215,6 +217,7 @@ describe("SourcesPanel", () => {
       status: "error",
       title: "Kaputt",
       errorMessage: "Diese Website konnte nicht gelesen werden.",
+      originalUrl: null,
     };
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     vi.stubGlobal("fetch", fetchMock);

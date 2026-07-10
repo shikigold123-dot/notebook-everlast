@@ -23,13 +23,13 @@ export async function POST(
   const notebook = await getNotebook(db, visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
   if (notebook.isDemo) {
     return NextResponse.json(
-      { error: "Demo-Dossier ist schreibgeschützt." },
+      { error: "Demo-Notebook ist schreibgeschützt." },
       { status: 403 }
     );
   }

@@ -26,10 +26,8 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
-import {
-  POST,
-  tokenOptionsForType,
-} from "@/app/api/notebooks/[id]/blob-upload-token/route";
+import { POST } from "@/app/api/notebooks/[id]/blob-upload-token/route";
+import { tokenOptionsForType } from "@/lib/ingestion/upload-limits";
 
 const VISITOR = "aaaaaaaa-0000-4000-8000-000000000001";
 let notebookId: string;
@@ -97,7 +95,7 @@ describe("POST /api/notebooks/[id]/blob-upload-token", () => {
     expect(res.status).toBe(401);
   });
 
-  it("liefert 404 für ein fremdes Dossier", async () => {
+  it("liefert 404 für ein fremdes Notebook", async () => {
     const res = await POST(postRequest({}), {
       params: Promise.resolve({
         id: "00000000-0000-4000-8000-000000000000",
@@ -106,7 +104,7 @@ describe("POST /api/notebooks/[id]/blob-upload-token", () => {
     expect(res.status).toBe(404);
   });
 
-  it("blockiert Upload-Tokens für Demo-Dossiers", async () => {
+  it("blockiert Upload-Tokens für Demo-Notebooks", async () => {
     await testDb
       .update(notebook)
       .set({ isDemo: true })
@@ -115,7 +113,7 @@ describe("POST /api/notebooks/[id]/blob-upload-token", () => {
     const res = await POST(postRequest({}), ctx());
     expect(res.status).toBe(403);
     const json = await res.json();
-    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(json.error).toBe("Demo-Notebook ist schreibgeschützt.");
     expect(handleUploadMock).not.toHaveBeenCalled();
   });
 

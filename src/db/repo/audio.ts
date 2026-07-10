@@ -48,6 +48,33 @@ export async function getLatestAudioOverview(
   return rows[0] ?? null;
 }
 
+export async function listAudioOverviews(
+  db: Db,
+  notebookId: string,
+  visitorId?: string
+) {
+  if (visitorId) {
+    const rows = await db
+      .select({ row: audioOverview })
+      .from(audioOverview)
+      .innerJoin(notebook, eq(audioOverview.notebookId, notebook.id))
+      .where(
+        and(
+          eq(audioOverview.notebookId, notebookId),
+          readableNotebook(visitorId)
+        )
+      )
+      .orderBy(desc(audioOverview.createdAt), desc(audioOverview.id));
+    return rows.map((r) => r.row);
+  }
+
+  return db
+    .select()
+    .from(audioOverview)
+    .where(eq(audioOverview.notebookId, notebookId))
+    .orderBy(desc(audioOverview.createdAt), desc(audioOverview.id));
+}
+
 export async function createQueuedAudioOverview(db: Db, notebookId: string) {
   const [created] = await db
     .insert(audioOverview)
@@ -125,4 +152,25 @@ export function estimateScriptDuration(script: AudioScriptTurn[]) {
     .map((turn) => turn.text.trim().split(/\s+/).filter(Boolean).length)
     .reduce((sum, count) => sum + count, 0);
   return Math.max(1, Math.round((words / 155) * 60));
+}
+
+export async function deleteAudioOverview(
+  db: Db,
+  notebookId: string,
+  audioId: string,
+  visitorId: string
+) {
+  const rows = await db
+    .select()
+    .from(notebook)
+    .where(and(eq(notebook.id, notebookId), eq(notebook.visitorId, visitorId)))
+    .limit(1);
+  if (rows.length === 0) return false;
+
+  await db
+    .delete(audioOverview)
+    .where(
+      and(eq(audioOverview.id, audioId), eq(audioOverview.notebookId, notebookId))
+    );
+  return true;
 }

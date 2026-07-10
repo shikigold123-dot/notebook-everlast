@@ -2,7 +2,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { usageCounter } from "@/db/schema";
 import type { Db } from "@/db";
 
-export type UsageMetric = "chat" | "artifact" | "audio" | "est_cost_cents";
+export type UsageMetric =
+  | "chat"
+  | "artifact"
+  | "audio"
+  | "research"
+  | "est_cost_cents";
 
 export async function getUsageValue(
   db: Db,

@@ -51,7 +51,12 @@ export async function extractAudio(
 
   const { filename, mimeType } = guessAudioFile(blobUrl);
   const file = new File([buffer], filename, { type: mimeType });
+  return transcribeAudioFile(file);
+}
 
+export async function transcribeAudioFile(
+  file: File
+): Promise<AudioExtractionResult> {
   try {
     const client = getClient();
     const transcription = await client.audio.transcriptions.create({

@@ -7,7 +7,15 @@ export type ArtifactKind =
   | "faq"
   | "timeline"
   | "briefing"
-  | "mindmap";
+  | "mindmap"
+  | "video_overview"
+  | "presentation"
+  | "flashcards"
+  | "quiz"
+  | "infographic"
+  | "website"
+  | "data_table"
+  | "glossary";
 
 function readableNotebook(visitorId: string) {
   return or(eq(notebook.visitorId, visitorId), eq(notebook.isDemo, true));
@@ -41,16 +49,45 @@ export async function createArtifact(
   db: Db,
   notebookId: string,
   type: ArtifactKind,
-  content: unknown
+  content: unknown,
+  status: "ready" | "error" = "ready"
 ) {
   const [created] = await db
     .insert(artifact)
     .values({
       notebookId,
       type,
-      status: "ready",
+      status,
       content,
     })
     .returning();
   return created;
+}
+
+export async function createArtifactError(
+  db: Db,
+  notebookId: string,
+  type: ArtifactKind,
+  message: string
+) {
+  return createArtifact(db, notebookId, type, { message }, "error");
+}
+
+export async function deleteArtifact(
+  db: Db,
+  notebookId: string,
+  artifactId: string,
+  visitorId: string
+) {
+  const rows = await db
+    .select()
+    .from(notebook)
+    .where(and(eq(notebook.id, notebookId), eq(notebook.visitorId, visitorId)))
+    .limit(1);
+  if (rows.length === 0) return false;
+
+  await db
+    .delete(artifact)
+    .where(and(eq(artifact.id, artifactId), eq(artifact.notebookId, notebookId)));
+  return true;
 }

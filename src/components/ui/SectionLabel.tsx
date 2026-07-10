@@ -8,7 +8,7 @@ export function SectionLabel({
   // children liegen direkt im Label-Element (kein Wrapper-Span),
   // damit getByText das Element mit der label-caps-Klasse findet.
   return (
-    <span className="label-caps inline-flex items-baseline gap-2 bg-ink px-1.5 py-0.5 text-paper">
+    <span className="label-caps ki-pill inline-flex min-h-8 items-center gap-2 px-3 py-1 text-muted">
       {children}
       {count !== undefined && <span>[{count}]</span>}
     </span>

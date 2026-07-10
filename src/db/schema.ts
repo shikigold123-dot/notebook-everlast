@@ -17,6 +17,7 @@ export const sourceType = pgEnum("source_type", [
   "url",
   "youtube",
   "audio",
+  "research",
 ]);
 export const sourceStatus = pgEnum("source_status", [
   "pending",
@@ -31,6 +32,14 @@ export const artifactType = pgEnum("artifact_type", [
   "timeline",
   "briefing",
   "mindmap",
+  "video_overview",
+  "presentation",
+  "flashcards",
+  "quiz",
+  "infographic",
+  "website",
+  "data_table",
+  "glossary",
 ]);
 export const artifactStatus = pgEnum("artifact_status", [
   "pending",
@@ -102,6 +111,25 @@ export const chatMessage = pgTable("chat_message", {
     .notNull()
     .defaultNow(),
 });
+
+export const note = pgTable(
+  "note",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    notebookId: uuid("notebook_id")
+      .notNull()
+      .references(() => notebook.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("note_notebook_id_idx").on(t.notebookId)]
+);
 
 export const artifact = pgTable("artifact", {
   id: uuid("id").primaryKey().defaultRandom(),

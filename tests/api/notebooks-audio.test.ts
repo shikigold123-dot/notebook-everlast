@@ -107,11 +107,67 @@ describe("POST /api/notebooks/[id]/audio", () => {
     expect(latest?.status).toBe("script");
   });
 
+  it("respektiert eine explizit leere Quellenauswahl", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sourceIds: [] }),
+      }),
+      ctx()
+    );
+
+    expect(res.status).toBe(400);
+    expect(generateAudioScriptMock).not.toHaveBeenCalled();
+  });
+
+  it("reicht Sprecherrollen, Länge und Freitext-Anweisung an die Skript-Generierung durch", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          detailLevel: "brief",
+          customInstructions: "Fokus auf Kapitel 2",
+          speakerA: "Skeptikerin",
+          speakerB: "Enthusiast",
+        }),
+      }),
+      ctx()
+    );
+
+    expect(res.status).toBe(201);
+    expect(generateAudioScriptMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customization: {
+          detailLevel: "brief",
+          customInstructions: "Fokus auf Kapitel 2",
+          speakerA: "Skeptikerin",
+          speakerB: "Enthusiast",
+        },
+      })
+    );
+  });
+
   it("liefert 400 ohne bereite Quellen", async () => {
     const res = await POST(new Request("http://localhost"), ctx());
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe("Füge zuerst eine bereite Quelle hinzu.");
+    expect(json.error).toBe("Wähle mindestens eine bereite Quelle oder Notiz aus.");
   });
 
   it("liefert 401 ohne Besucher-Cookie", async () => {
@@ -120,14 +176,14 @@ describe("POST /api/notebooks/[id]/audio", () => {
     expect(res.status).toBe(401);
   });
 
-  it("liefert 404 für ein fremdes Dossier", async () => {
+  it("liefert 404 für ein fremdes Notebook", async () => {
     const res = await POST(new Request("http://localhost"), {
       params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
     });
     expect(res.status).toBe(404);
   });
 
-  it("blockiert Schreibzugriff auf Demo-Dossiers", async () => {
+  it("blockiert Schreibzugriff auf Demo-Notebooks", async () => {
     await testDb
       .update(notebook)
       .set({ isDemo: true })
@@ -136,7 +192,7 @@ describe("POST /api/notebooks/[id]/audio", () => {
     const res = await POST(new Request("http://localhost"), ctx());
     expect(res.status).toBe(403);
     const json = await res.json();
-    expect(json.error).toBe("Demo-Dossier ist schreibgeschützt.");
+    expect(json.error).toBe("Demo-Notebook ist schreibgeschützt.");
   });
 
   it("verhindert ein zweites Audio Overview", async () => {
@@ -152,7 +208,36 @@ describe("POST /api/notebooks/[id]/audio", () => {
 
     expect(res.status).toBe(409);
     const json = await res.json();
-    expect(json.error).toBe("Audio Overview existiert bereits.");
+    expect(json.error).toContain("Audio-Skript ist bereit");
+  });
+
+  it("synthetisiert ein vorhandenes Skript nachträglich zu einer MP3", async () => {
+    await createSource(testDb, notebookId, {
+      type: "text",
+      title: "Quelle",
+      content: "Quellentext",
+      tokenCount: 3,
+    });
+    await POST(new Request("http://localhost"), ctx());
+    isAudioTtsConfiguredMock.mockReturnValue(true);
+
+    const res = await POST(new Request("http://localhost"), ctx());
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.audioOverview.status).toBe("ready");
+    expect(json.audioOverview.audioBlobUrl).toBe(
+      "https://blob.example/audio.mp3"
+    );
+    expect(synthesizeAudioOverviewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notebookId,
+        script: [
+          { speaker: "A", text: "Frage" },
+          { speaker: "B", text: "Antwort" },
+        ],
+      })
+    );
   });
 
   it("speichert OpenRouter-Fehler in der Audio-Zeile", async () => {
@@ -226,7 +311,7 @@ describe("POST /api/notebooks/[id]/audio", () => {
     ]);
   });
 
-  it("liefert 429 ab dem Audio-Tageslimit", async () => {
+  it("liefert keinen Fehler 429 bei Überschreitung des Audio-Tageslimits", async () => {
     process.env.LIMIT_AUDIO_PER_VISITOR_DAY = "1";
     await createSource(testDb, notebookId, {
       type: "text",
@@ -248,9 +333,7 @@ describe("POST /api/notebooks/[id]/audio", () => {
       params: Promise.resolve({ id: other.id }),
     });
 
-    expect(res.status).toBe(429);
-    const json = await res.json();
-    expect(json.error).toContain("Tageslimit erreicht");
+    expect(res.status).toBe(201);
   });
 });
 

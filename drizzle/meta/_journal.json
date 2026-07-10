@@ -8,6 +8,34 @@
       "when": 1783395846556,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783497600000,
+      "tag": "0001_add_research_source_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783516800000,
+      "tag": "0002_expand_studio_artifacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783603200000,
+      "tag": "0003_add_website_artifact",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783652400000,
+      "tag": "0004_add_notes",
+      "breakpoints": true
     }
   ]
 }

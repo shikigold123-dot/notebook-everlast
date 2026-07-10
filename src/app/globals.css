@@ -1,45 +1,421 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-paper: #f2f2ef;
-  --color-ground: #e9e9e6;
-  --color-ink: #1a1a1a;
-  --color-signal: #ffd23f;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --radius: 0;
+  --color-paper: var(--theme-paper);
+  --color-ground: var(--theme-ground);
+  --color-ink: var(--theme-ink);
+  --color-signal: var(--theme-signal);
+  --color-signal-ink: var(--theme-signal-ink);
+  --color-panel: var(--theme-panel);
+  --color-panel-soft: var(--theme-panel-soft);
+  --color-muted: var(--theme-muted);
+  --color-line: var(--theme-line);
+  --color-danger: var(--theme-danger);
+  --color-danger-ink: var(--theme-danger-ink);
+  --font-mono: var(--font-geist-mono, ui-monospace), "SFMono-Regular", Menlo,
+    Monaco, Consolas, monospace;
+  --font-sans: var(--font-geist-sans, system-ui), -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --radius-sm: 0.5rem; /* 8px — inline chips, banners */
+  --radius-md: 1rem; /* 16px — content cards, inputs */
+  --radius-lg: 1.5rem; /* 24px — major surfaces */
+  --shadow-card: var(--theme-shadow-card);
+  --shadow-panel: var(--theme-shadow-panel);
+  --shadow-pop: var(--theme-shadow-pop);
+  --shadow-glow: var(--theme-shadow-glow);
+}
+
+:root {
+  color-scheme: light;
+  --theme-paper: #fcfdf8;
+  --theme-ground: #eef2e8;
+  --theme-ink: #0c1108;
+  --theme-signal: #d4ff42;
+  --theme-signal-ink: #0c1108;
+  --theme-panel: #fafdf4;
+  --theme-panel-soft: #eaf0e2;
+  --theme-muted: #485143;
+  --theme-line: #cdd8be;
+  --theme-danger: #b3372a;
+  --theme-danger-ink: #fdf6f0;
+  --theme-glow-a: rgba(212, 255, 66, 0.16);
+  --theme-glow-b: rgba(12, 17, 8, 0.05);
+  --theme-body-top: #fbfcf5;
+  --theme-body-mid: #eef2e8;
+  --theme-body-bottom: #e2e8d6;
+  --theme-placeholder: rgba(12, 17, 8, 0.5);
+  --theme-scrollbar: rgba(12, 17, 8, 0.2);
+  --theme-shadow-card: 0 1px 2px rgba(12, 17, 8, 0.04),
+    0 12px 32px rgba(12, 17, 8, 0.06);
+  --theme-shadow-panel: 0 2px 6px rgba(12, 17, 8, 0.04),
+    0 24px 64px rgba(12, 17, 8, 0.07);
+  --theme-shadow-pop: 0 4px 8px rgba(12, 17, 8, 0.07),
+    0 20px 48px rgba(12, 17, 8, 0.12);
+  --theme-shadow-glow: 0 0 0 1px rgba(212, 255, 66, 0.12),
+    0 8px 24px rgba(212, 255, 66, 0.14);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --theme-paper: #171c18;
+  --theme-ground: #070a07;
+  --theme-ink: #f8faf2;
+  --theme-signal: #d4ff42;
+  --theme-signal-ink: #0c1108;
+  --theme-panel: #1e2520;
+  --theme-panel-soft: #283128;
+  --theme-muted: #c4cdb8;
+  --theme-line: #3d4a3a;
+  --theme-danger: #ff9086;
+  --theme-danger-ink: #2a0f0b;
+  --theme-glow-a: rgba(212, 255, 66, 0.12);
+  --theme-glow-b: rgba(255, 255, 255, 0.04);
+  --theme-body-top: #141a13;
+  --theme-body-mid: #0a0e0a;
+  --theme-body-bottom: #060906;
+  --theme-placeholder: rgba(248, 250, 242, 0.52);
+  --theme-scrollbar: rgba(248, 250, 242, 0.18);
+  --theme-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2),
+    0 12px 32px rgba(0, 0, 0, 0.24);
+  --theme-shadow-panel: 0 2px 6px rgba(0, 0, 0, 0.24),
+    0 24px 64px rgba(0, 0, 0, 0.32);
+  --theme-shadow-pop: 0 4px 8px rgba(0, 0, 0, 0.28),
+    0 20px 48px rgba(0, 0, 0, 0.4);
+  --theme-shadow-glow: 0 0 0 1px rgba(212, 255, 66, 0.16),
+    0 8px 24px rgba(212, 255, 66, 0.1);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 body {
   background: var(--color-ground);
+  background-image: radial-gradient(
+      ellipse 60% 40% at 50% -10%,
+      var(--theme-glow-a),
+      transparent
+    ),
+    linear-gradient(
+      180deg,
+      var(--theme-body-top) 0%,
+      var(--theme-body-mid) 60%,
+      var(--theme-body-bottom) 100%
+    );
+  background-attachment: fixed;
   color: var(--color-ink);
+  min-width: 320px;
 }
 
-/* Versalien-Label — wiederkehrendes Dossier-Element */
+::selection {
+  background: var(--color-signal);
+  color: var(--theme-signal-ink);
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+/* Versalien-Label — wiederkehrendes Notebook-Element */
 .label-caps {
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.04em;
   font-family: var(--font-mono);
   font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ki-shell {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      var(--theme-glow-a),
+      transparent
+    ),
+    linear-gradient(
+      180deg,
+      var(--theme-body-top) 0%,
+      var(--theme-body-mid) 100%
+    );
+}
+
+.ki-card {
+  background: color-mix(in srgb, var(--theme-paper) 96%, transparent);
+  border: 1.5px solid var(--theme-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--theme-shadow-card);
+}
+
+.ki-panel {
+  background: color-mix(in srgb, var(--theme-paper) 96%, transparent);
+  border: 1.5px solid var(--theme-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--theme-shadow-panel);
+}
+
+.ki-soft {
+  background: color-mix(in srgb, var(--theme-panel-soft) 88%, var(--theme-paper));
+  border: 1.5px solid color-mix(in srgb, var(--theme-line) 80%, var(--theme-ink));
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--theme-paper) 60%, transparent);
+}
+
+.ki-pill {
+  border-radius: 999px;
+  border: 1.5px solid var(--theme-line);
+  background: color-mix(in srgb, var(--theme-paper) 94%, var(--theme-panel-soft));
+}
+
+/* Icon-Kachel — einheitlicher Chip für Panel-Header, Listen, Aktionen */
+.ki-tile {
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--theme-line) 70%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--theme-panel-soft) 80%, var(--theme-paper));
+  color: var(--theme-ink);
+}
+
+/* Kategorie-Kachel — Studio-Aktionen bekommen je Typ einen eigenen Farbton,
+   berechnet relativ zu den Theme-Tokens, damit Light/Dark automatisch passen.
+   --swatch wird pro Element inline gesetzt (z. B. style={{ "--swatch": "#7c6fea" }}). */
+.ki-swatch {
+  background: color-mix(in srgb, var(--swatch) 13%, var(--theme-paper));
+  border: 1.5px solid color-mix(in srgb, var(--swatch) 26%, var(--theme-line));
+}
+
+.ki-swatch-icon {
+  background: color-mix(in srgb, var(--swatch) 34%, var(--theme-paper));
+  color: color-mix(in srgb, var(--swatch) 82%, var(--theme-ink));
+}
+
+/* Schwebendes Menü (Dropdowns, Kontextmenüs) */
+.ki-menu {
+  background: var(--theme-paper);
+  border: 1.5px solid var(--theme-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--theme-shadow-pop);
+  overflow: hidden;
+}
+
+.ki-cta {
+  background: var(--theme-signal);
+  color: var(--theme-signal-ink);
+  box-shadow: var(--theme-shadow-glow);
+}
+
+.ki-cta:hover {
+  background: color-mix(in srgb, var(--theme-signal) 88%, var(--theme-ink));
+  color: var(--theme-signal-ink);
+  box-shadow: 0 0 0 1px rgba(212, 255, 66, 0.2),
+    0 12px 32px rgba(212, 255, 66, 0.2);
+}
+
+.ki-raised {
+  background: var(--theme-paper);
+  border: 1.5px solid var(--theme-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--theme-shadow-card);
+}
+
+.ki-interactive {
+  transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ki-interactive:hover {
+  border-color: color-mix(in srgb, var(--theme-signal) 60%, var(--theme-line));
+  transform: translateY(-1px);
+  box-shadow: var(--theme-shadow-pop);
+}
+
+.ki-interactive:active {
+  transform: translateY(0);
+  box-shadow: var(--theme-shadow-card);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="separator"]:focus-visible {
+  outline: 2px solid var(--theme-signal);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-signal) 20%, transparent);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--theme-placeholder);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--theme-signal);
+}
+
+::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--theme-scrollbar);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--theme-scrollbar) 160%, var(--theme-ink));
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.intro-overlay {
+  animation: introOverlay 2.6s ease forwards;
+}
+
+.intro-card {
+  animation: introCard 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.intro-title {
+  letter-spacing: 0;
+}
+
+.intro-scanline {
+  animation: introScan 1.7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  background: var(--color-signal);
+  height: 2px;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+.intro-tick {
+  animation: introTick 900ms ease-in-out infinite alternate;
+  background: transparent;
+  border-radius: 999px;
+}
+
+@keyframes introOverlay {
+  0%,
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes introCard {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  18%,
+  82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes introScan {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(168px);
+  }
+}
+
+@keyframes introTick {
+  from {
+    background: transparent;
+  }
+  to {
+    background: var(--color-paper);
+  }
+}
+
+/* Sanftes Eintreten neuer Inhalte (Nachrichten, Listenzeilen) */
+.ki-enter {
+  animation: kiEnter 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes kiEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .react-flow__controls {
-  border: 1.5px solid var(--color-ink);
-  box-shadow: none;
+  border: 1.5px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--theme-shadow-card);
+  overflow: hidden;
 }
 
 .react-flow__controls-button {
-  border-bottom: 1.5px solid var(--color-ink);
+  border-bottom: 1px solid var(--color-line);
   background: var(--color-paper);
-  border-radius: 0;
+  color: var(--color-ink);
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none;
 }
 
 .react-flow__controls-button:hover {
   background: var(--color-signal);
+  color: var(--color-signal-ink);
 }
 
 .react-flow__attribution {
-  background: var(--color-paper);
-  border: 1.5px solid var(--color-ink);
-  color: var(--color-ink);
+  background: color-mix(in srgb, var(--theme-paper) 85%, transparent);
+  color: var(--color-muted);
 }

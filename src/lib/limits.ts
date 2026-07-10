@@ -10,7 +10,7 @@ export const LIMITS = {
     return intFromEnv("LIMIT_NOTEBOOKS_PER_VISITOR", 5);
   },
   get sourcesPerNotebook() {
-    return intFromEnv("LIMIT_SOURCES_PER_NOTEBOOK", 8);
+    return intFromEnv("LIMIT_SOURCES_PER_NOTEBOOK", 24);
   },
   get tokensPerNotebook() {
     return intFromEnv("LIMIT_TOKENS_PER_NOTEBOOK", 100_000);
@@ -23,6 +23,9 @@ export const LIMITS = {
   },
   get audioPerVisitorDay() {
     return intFromEnv("LIMIT_AUDIO_PER_VISITOR_DAY", 2);
+  },
+  get researchPerVisitorDay() {
+    return intFromEnv("LIMIT_RESEARCH_PER_VISITOR_DAY", 3);
   },
   get audioGlobalDay() {
     return intFromEnv("LIMIT_AUDIO_GLOBAL_DAY", 10);

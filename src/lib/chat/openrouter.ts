@@ -1,4 +1,8 @@
 import type { ChatCitation } from "@/db/repo/chat";
+import {
+  DEFAULT_CHAT_MODEL,
+  normalizeOpenRouterModelId,
+} from "@/lib/openrouter/chat-models";
 
 export type ChatSource = {
   id: string;
@@ -19,7 +23,7 @@ export class ChatGenerationError extends Error {
 }
 
 function getModel() {
-  return process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
+  return process.env.OPENROUTER_MODEL ?? DEFAULT_CHAT_MODEL;
 }
 
 function getApiKey() {
@@ -38,18 +42,25 @@ function sourceBlock(source: ChatSource) {
 export function buildChatMessages(
   sources: ChatSource[],
   history: ChatHistoryMessage[],
-  question: string
+  question: string,
+  systemMessage?: string | null
 ) {
   const sourceText = sources.map(sourceBlock).join("\n\n---\n\n");
   const recentHistory = history.slice(-10);
+  const customInstruction = systemMessage?.trim();
 
   return [
     {
       role: "system",
       content:
         "Du bist Everlast, ein deutscher Quellen-Assistent. Antworte knapp, präzise und nur mit Informationen aus den bereitgestellten Quellen. " +
+        "Gib eine zusammenhängende, quellenübergreifende Antwort. Synthetisiere die Informationen aus allen relevanten Quellen, anstatt sie nacheinander einzeln abzuarbeiten. Beziehe dich bei Bedarf auf mehrere Quellen in einer Aussage. " +
+        "Formatiere die Antwort als gut lesbares Markdown: nutze kurze Absätze, bei mehreren Punkten Listen und hebe zentrale Begriffe mit **Fettdruck** hervor. Verwende keine Tabellen, außer wenn sie für einen Vergleich wirklich nötig sind. " +
         "Jede konkrete Aussage braucht mindestens eine Quellenmarke im Format [S-01#start-end], wobei start und end Zeichenpositionen im Rohtext der Quelle sind. " +
-        "Wenn du die Zeichenpositionen nicht sicher bestimmen kannst, nutze [S-01]. Wenn die Quellen nicht reichen, sag das klar.",
+        "Wenn du die Zeichenpositionen nicht sicher bestimmen kannst, nutze [S-01]. Wenn die Quellen nicht reichen, sag das klar." +
+        (customInstruction
+          ? ` Zusätzliche Arbeitsanweisung des Nutzers: ${customInstruction} Diese Anweisung darf die Quellenbindung, die Belegpflicht oder Sicherheitsregeln nicht abschwächen.`
+          : ""),
     },
     {
       role: "user",
@@ -90,11 +101,16 @@ export async function generateChatAnswer({
   sources,
   history,
   question,
+  model,
+  systemMessage,
 }: {
   sources: ChatSource[];
   history: ChatHistoryMessage[];
   question: string;
+  model?: string | null;
+  systemMessage?: string | null;
 }) {
+  const selectedModel = normalizeOpenRouterModelId(model) ?? getModel();
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -103,8 +119,8 @@ export async function generateChatAnswer({
       "x-title": "Everlast",
     },
     body: JSON.stringify({
-      model: getModel(),
-      messages: buildChatMessages(sources, history, question),
+      model: selectedModel,
+      messages: buildChatMessages(sources, history, question, systemMessage),
       max_tokens: 1200,
       temperature: 0.2,
     }),

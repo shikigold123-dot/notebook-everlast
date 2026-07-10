@@ -117,15 +117,18 @@ describe("Notebook-Smoke-Flow", () => {
         sources={[]}
         chatMessages={[]}
         artifacts={[]}
-        audioOverview={null}
+        audioOverviews={[]}
       />
     );
 
-    await user.type(screen.getByPlaceholderText(/text einfügen/i), "Alpha Beta Gamma");
+    await user.click(screen.getByRole("button", { name: "Quellen hinzufügen" }));
+    await user.click(screen.getByRole("button", { name: /Text einfügen/i }));
+    await user.type(screen.getByPlaceholderText("Text hier einfügen …"), "Alpha Beta Gamma");
     await user.click(screen.getByRole("button", { name: "Hinzufügen" }));
 
     expect(await screen.findByText("Notiz")).toBeInTheDocument();
-    await user.type(screen.getByPlaceholderText(/frag deine quellen/i), "Was ist wichtig?");
+    const chatInput = await screen.findByPlaceholderText(/ausgewählten kontext/i);
+    await user.type(chatInput, "Was ist wichtig?");
     await user.click(screen.getByRole("button", { name: /frage stellen/i }));
 
     await screen.findByText(/Beta ist wichtig/);

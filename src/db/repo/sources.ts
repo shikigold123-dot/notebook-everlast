@@ -5,12 +5,13 @@ import { LIMITS } from "@/lib/limits";
 import { LimitExceededError } from "./notebooks";
 
 export type NewSourceInput = {
-  type: "text" | "pdf" | "url" | "youtube" | "audio";
+  type: "text" | "pdf" | "url" | "youtube" | "audio" | "research";
   title: string;
   content?: string;
   tokenCount?: number;
   originalUrl?: string;
   blobUrl?: string;
+  meta?: unknown;
 };
 
 function readableNotebook(visitorId: string) {
@@ -100,7 +101,7 @@ export async function createSource(
 
   if (existing >= LIMITS.sourcesPerNotebook) {
     throw new LimitExceededError(
-      `Maximal ${LIMITS.sourcesPerNotebook} Quellen pro Dossier — lösch eine, um Platz zu schaffen.`
+      `Maximal ${LIMITS.sourcesPerNotebook} Quellen pro Notebook — lösch eine, um Platz zu schaffen.`
     );
   }
 
@@ -108,7 +109,7 @@ export async function createSource(
     const existingTokens = await getReadyTokenTotal(db, notebookId);
     if (existingTokens + input.tokenCount > LIMITS.tokensPerNotebook) {
       throw new LimitExceededError(
-        `Dieses Dossier überschreitet damit das Token-Limit von ${LIMITS.tokensPerNotebook.toLocaleString(
+        `Dieses Notebook überschreitet damit das Token-Limit von ${LIMITS.tokensPerNotebook.toLocaleString(
           "de-DE"
         )} Tokens.`
       );
@@ -126,6 +127,7 @@ export async function createSource(
       tokenCount: input.tokenCount ?? null,
       originalUrl: input.originalUrl ?? null,
       blobUrl: input.blobUrl ?? null,
+      meta: input.meta ?? null,
     })
     .returning();
   return created;

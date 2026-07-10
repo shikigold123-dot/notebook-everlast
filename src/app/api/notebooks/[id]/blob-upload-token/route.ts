@@ -5,19 +5,8 @@ import { getDb } from "@/db";
 import { readVisitorId } from "@/lib/visitor";
 import { getNotebook } from "@/db/repo/notebooks";
 import {
-  UPLOAD_MAX_SIZES,
-  UPLOAD_CONTENT_TYPES,
+  tokenOptionsForType,
 } from "@/lib/ingestion/upload-limits";
-
-export function tokenOptionsForType(clientPayload: string | null) {
-  const payload = clientPayload ? JSON.parse(clientPayload) : {};
-  const type: "pdf" | "audio" = payload.type === "audio" ? "audio" : "pdf";
-  return {
-    allowedContentTypes: UPLOAD_CONTENT_TYPES[type],
-    maximumSizeInBytes: UPLOAD_MAX_SIZES[type],
-    tokenPayload: clientPayload ?? "{}",
-  };
-}
 
 export async function POST(
   request: Request,
@@ -35,13 +24,13 @@ export async function POST(
   const notebook = await getNotebook(getDb(), visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
   if (notebook.isDemo) {
     return NextResponse.json(
-      { error: "Demo-Dossier ist schreibgeschützt." },
+      { error: "Demo-Notebook ist schreibgeschützt." },
       { status: 403 }
     );
   }

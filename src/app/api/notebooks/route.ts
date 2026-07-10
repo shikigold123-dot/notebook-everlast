@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   const title =
     typeof body?.title === "string" && body.title.trim()
       ? body.title.trim()
-      : "Unbenanntes Dossier";
+      : "Unbenanntes Notebook";
 
   if (title.length > 200) {
     return NextResponse.json(

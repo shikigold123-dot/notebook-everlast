@@ -31,7 +31,7 @@ describe("Artifact-Repository", () => {
     expect(rows[0].status).toBe("ready");
   });
 
-  it("liefert keine Artefakte aus anderen Dossiers", async () => {
+  it("liefert keine Artefakte aus anderen Notebooks", async () => {
     const other = await createNotebook(
       db,
       "bbbbbbbb-0000-4000-8000-000000000002",

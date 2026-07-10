@@ -1,7 +1,8 @@
 # Everlast
 
-NotebookLM-Alternative im Dossier-Design: Quellen hochladen, mit ihnen
-chatten (mit klickbaren Zitaten), Artefakte generieren, KI-Podcast erzeugen.
+NotebookLM-Alternative im Notebook-Design: Quellen hochladen, mit ihnen
+chatten (mit klickbaren Zitaten), eigene Notizen als selektiven KI-Kontext
+verwenden, Artefakte generieren und KI-Podcasts erzeugen.
 
 ## Setup (lokal)
 
@@ -14,15 +15,16 @@ chatten (mit klickbaren Zitaten), Artefakte generieren, KI-Podcast erzeugen.
      OpenRouter lokal geschätzt)
    - `OPENROUTER_MODEL` (optional; Standard: `google/gemini-2.5-flash`, auch
      für den Chat)
-   - `OPENAI_API_KEY` (OpenAI — nur für Audio-Transkription)
+   - `OPENAI_API_KEY` (OpenAI — Audio-Transkription und bevorzugtes TTS)
+   - `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE_A`, `OPENAI_TTS_VOICE_B` (optional;
+     Standard: `gpt-4o-mini-tts`, `alloy`, `onyx`)
    - `BLOB_READ_WRITE_TOKEN` (Vercel Blob — im Vercel-Dashboard einen Blob-Store
      anlegen und den Token kopieren)
    - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_A`, `ELEVENLABS_VOICE_B`
-     (optional — echte MP3-Erzeugung für Audio Overview; ohne diese Werte bleibt
-     das Podcast-Skript verfügbar)
+     (optional — Fallback für Audio Overview, falls OpenAI-TTS nicht gesetzt ist)
 5. `npm run dev` → http://localhost:3000
 
-Demo-Dossier seedbar machen:
+Demo-Notebook seedbar machen:
 
 ```bash
 npm run db:seed:demo
@@ -43,9 +45,10 @@ npm run smoke
 1. Neon-Datenbank in Vercel als `DATABASE_URL` setzen.
 2. `OPENROUTER_API_KEY` setzen; optional `OPENROUTER_MODEL` überschreiben.
 3. Für Uploads `BLOB_READ_WRITE_TOKEN` aus dem Vercel-Blob-Store setzen.
-4. Für Audio-Transkription `OPENAI_API_KEY` setzen.
-5. Für echte MP3-Audio-Overviews optional `ELEVENLABS_API_KEY`,
-   `ELEVENLABS_VOICE_A`, `ELEVENLABS_VOICE_B` setzen.
+4. Für Audio-Transkription und Audio-Overviews `OPENAI_API_KEY` setzen.
+5. Optional zusätzlich
+   `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_A`, `ELEVENLABS_VOICE_B` als
+   Fallback konfigurieren.
 6. Vor Deployment lokal prüfen:
 
 ```bash
@@ -67,3 +70,4 @@ npm run db:seed:demo
 
 - Design-Spec: `docs/superpowers/specs/2026-07-06-everlast-notebooklm-alternative-design.md`
 - Pläne: `docs/superpowers/plans/`
+- Open-Notebook-Vergleich: `docs/open-notebook-gap-roadmap.md`

@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getDb } from "@/db";
 import { getNotebook } from "@/db/repo/notebooks";
-import { createChatMessage, listChatMessages } from "@/db/repo/chat";
-import { listSources } from "@/db/repo/sources";
+import { createChatMessage, listChatMessages, clearChatMessages } from "@/db/repo/chat";
 import { readVisitorId } from "@/lib/visitor";
 import {
   consumeDailyUsage,
@@ -13,12 +12,10 @@ import {
   ChatGenerationError,
   extractCitations,
   generateChatAnswer,
-  type ChatSource,
 } from "@/lib/chat/openrouter";
-
-function labelFor(index: number) {
-  return `S-${String(index + 1).padStart(2, "0")}`;
-}
+import { isStaleYoutubeMetadataAnswer } from "@/lib/sources/context";
+import { normalizeOpenRouterModelId } from "@/lib/openrouter/chat-models";
+import { buildNotebookAiContext } from "@/lib/sources/ai-context";
 
 function wantsEventStream(request: Request) {
   return request.headers.get("accept")?.includes("text/event-stream") ?? false;
@@ -51,50 +48,56 @@ export async function POST(
   const notebook = await getNotebook(db, visitorId, notebookId);
   if (!notebook) {
     return NextResponse.json(
-      { error: "Dossier nicht gefunden." },
+      { error: "Notebook nicht gefunden." },
       { status: 404 }
     );
   }
   if (notebook.isDemo) {
     return NextResponse.json(
-      { error: "Demo-Dossier ist schreibgeschützt." },
+      { error: "Demo-Notebook ist schreibgeschützt." },
       { status: 403 }
     );
   }
 
   const body = await request.json().catch(() => ({}));
   const question = typeof body.question === "string" ? body.question.trim() : "";
+  const model = normalizeOpenRouterModelId(body.model);
+  const systemMessage =
+    typeof body.systemMessage === "string" ? body.systemMessage.trim() : "";
   if (!question) {
     return NextResponse.json(
       { error: "Frage darf nicht leer sein." },
       { status: 400 }
     );
   }
-
-  const sources = (await listSources(db, notebookId, visitorId))
-    .filter((source) => source.status === "ready" && source.content?.trim())
-    .map(
-      (source, index): ChatSource => ({
-        id: source.id,
-        label: labelFor(index),
-        title: source.title,
-        content: source.content ?? "",
-      })
-    );
-
-  if (sources.length === 0) {
+  if (systemMessage.length > 4000) {
     return NextResponse.json(
-      { error: "Füge zuerst eine bereite Quelle hinzu." },
+      { error: "Systemanweisung darf höchstens 4.000 Zeichen haben." },
       { status: 400 }
     );
   }
 
-  const history = (await listChatMessages(db, notebookId, visitorId)).map(
-    (message) => ({
+  const sources = await buildNotebookAiContext({
+    db,
+    notebookId,
+    visitorId,
+    sourceIds: body.sourceIds,
+    noteIds: body.noteIds,
+  });
+
+  if (sources.length === 0) {
+    return NextResponse.json(
+      { error: "Wähle mindestens eine bereite Quelle oder Notiz aus." },
+      { status: 400 }
+    );
+  }
+
+  const history = (await listChatMessages(db, notebookId, visitorId))
+    .filter((message) => !isStaleYoutubeMetadataAnswer(message.content))
+    .map((message) => ({
       role: message.role,
       content: message.content,
-    })
-  );
+    }));
 
   try {
     await consumeDailyUsage(db, visitorId, "chat");
@@ -121,6 +124,8 @@ export async function POST(
             sources,
             history,
             question,
+            model,
+            systemMessage,
           });
           for (const text of splitAnswer(answer)) {
             controller.enqueue(encodeEvent("delta", { text }));
@@ -164,6 +169,8 @@ export async function POST(
       sources,
       history,
       question,
+      model,
+      systemMessage,
     });
     const citations = extractCitations(answer, sources);
 
@@ -191,4 +198,29 @@ export async function POST(
     }
     throw err;
   }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: notebookId } = await params;
+  const visitorId = readVisitorId(await cookies());
+  if (!visitorId) {
+    return NextResponse.json(
+      { error: "Keine Besucher-Session — bitte Seite neu laden." },
+      { status: 401 }
+    );
+  }
+
+  const db = getDb();
+  const success = await clearChatMessages(db, notebookId, visitorId);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Notebook nicht gefunden oder schreibgeschützt." },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json({ success: true });
 }

@@ -40,11 +40,11 @@ function childrenOf(node: MindMapTree) {
 
 function MindNode({ data }: NodeProps<MindFlowNode>) {
   return (
-    <div className="max-w-48 border-[1.5px] border-ink bg-paper px-3 py-2 text-xs text-ink">
+    <div className="max-w-56 rounded-md border-[1.5px] border-line bg-paper px-3 py-2 text-xs text-ink shadow-card">
       <Handle type="target" position={Position.Left} className="!bg-ink" />
       <p className="font-bold leading-5">{data.label}</p>
       {data.childCount > 0 && (
-        <p className="label-caps mt-1 text-ink/60">
+        <p className="label-caps mt-1 text-muted">
           {data.collapsed ? `+${data.childCount}` : `${data.childCount}`}
         </p>
       )}
@@ -77,7 +77,7 @@ function buildFlow(root: MindMapTree, collapsed: Set<string>) {
           source: id,
           target: childId,
           type: "smoothstep",
-          style: { stroke: "#1a1a1a", strokeWidth: 1.5 },
+          style: { stroke: "var(--theme-line)", strokeWidth: 2 },
         });
         return place(child, childId, depth + 1);
       });
@@ -113,14 +113,14 @@ export function MindMapCanvas({ tree }: { tree: unknown }) {
 
   if (!root) {
     return (
-      <p className="border-[1.5px] border-ink bg-paper p-3 text-sm text-ink/60">
+      <p className="rounded-lg border-[1.5px] border-line bg-paper p-4 text-sm text-muted shadow-card">
         Mind Map konnte nicht gelesen werden.
       </p>
     );
   }
 
   return (
-    <div className="h-96 border-[1.5px] border-ink bg-ground">
+    <div className="h-96 overflow-hidden rounded-lg border-[1.5px] border-line bg-paper shadow-card">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -141,7 +141,7 @@ export function MindMapCanvas({ tree }: { tree: unknown }) {
           });
         }}
       >
-        <Background color="#1a1a1a" gap={24} lineWidth={0.5} />
+        <Background color="var(--theme-line)" gap={20} lineWidth={0.4} />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>
