@@ -1273,7 +1273,7 @@ export function StudioPanel({
               if (isAudio) {
                 if (isReady) {
                   const duration = formatDuration((item.rawItem as AudioOverviewItem).durationS);
-                  subtitle = `${duration ? duration + " · " : ""}Diskussion · ${readySourceCount + (selectedNoteIds?.length ?? 0)} Kontexte · ${formattedTime}`;
+                  subtitle = `${duration ? duration + " · " : ""}Diskussion · ${formattedTime}`;
                 } else if (item.status === "error") {
                   subtitle = "Generierungsfehler";
                 } else {
@@ -1281,7 +1281,7 @@ export function StudioPanel({
                 }
               } else {
                 if (isReady) {
-                  subtitle = `${ARTIFACT_LABELS[item.type as ArtifactKind]} · ${readySourceCount + (selectedNoteIds?.length ?? 0)} Kontexte · ${formattedTime}`;
+                  subtitle = `${ARTIFACT_LABELS[item.type as ArtifactKind]} · ${formattedTime}`;
                 } else if (item.status === "error") {
                   subtitle = "Fehler bei Generierung";
                 } else {

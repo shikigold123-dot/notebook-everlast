@@ -14,6 +14,8 @@ vi.mock("youtubei.js", () => ({
 vi.mock("node:child_process", () => ({
   spawn: (...args: unknown[]) => spawnMock(...args),
 }));
+const { existsSyncMock } = vi.hoisted(() => ({ existsSyncMock: vi.fn() }));
+vi.mock("node:fs", () => ({ existsSync: (...args: unknown[]) => existsSyncMock(...args) }));
 vi.mock("@/lib/ingestion/audio", () => ({
   transcribeAudioFile: (...args: unknown[]) => transcribeAudioFileMock(...args),
 }));
@@ -24,6 +26,7 @@ beforeEach(() => {
   createMock.mockReset();
   transcribeAudioFileMock.mockReset();
   spawnMock.mockReset();
+  existsSyncMock.mockReset().mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -274,6 +277,31 @@ describe("extractYoutube", () => {
       ]),
       expect.objectContaining({ timeout: 120000 })
     );
+  });
+
+  it("überspringt yt-dlp ohne Absturz, wenn kein Python-Interpreter gefunden wird (Serverless)", async () => {
+    // Simuliert Vercel/Cloudflare: kein Homebrew-Python vorhanden. Vorher
+    // führte das zu einem "spawn python3 ENOENT", der als Unhandled Rejection
+    // den gesamten Node-Prozess abgeschossen hat (Exit 128).
+    existsSyncMock.mockReturnValue(false);
+    vi.resetModules();
+    const { extractYoutube: extractYoutubeFresh } = await import(
+      "@/lib/ingestion/youtube"
+    );
+
+    createMock.mockResolvedValue({
+      getInfo: vi.fn().mockResolvedValue({
+        basic_info: { title: "Kein Python", duration: 123 },
+        captions: { caption_tracks: [] },
+        download: vi.fn().mockRejectedValue(new Error("No valid URL to decipher")),
+        getTranscript: vi.fn().mockRejectedValue(new Error("Kein Panel")),
+      }),
+    });
+
+    await expect(
+      extractYoutubeFresh("https://www.youtube.com/watch?v=abcdefghijk")
+    ).rejects.toThrow("kein abrufbares Transkript");
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 
   it("wirft einen IngestionError ohne abrufbares Transkript", async () => {

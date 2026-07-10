@@ -135,6 +135,101 @@ describe("SourcesPanel", () => {
     expect(mark.tagName).toBe("MARK");
   });
 
+  it("zeigt bei gefundenen Web-Quellen den Titel statt nur den Link", async () => {
+    const RESEARCH_READY: SourceListItem = {
+      id: "s-1",
+      type: "research",
+      status: "ready",
+      title: "Recherche: KI-Trends",
+      errorMessage: null,
+      originalUrl: null,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          source: {
+            ...RESEARCH_READY,
+            content: "Recherchebericht …",
+            tokenCount: 42,
+            originalUrl: null,
+            blobUrl: null,
+            createdAt: "2026-07-08T10:00:00.000Z",
+            meta: {
+              query: "KI-Trends 2026",
+              citations: ["https://example.com/artikel-ueber-ki"],
+              foundSources: [
+                {
+                  url: "https://example.com/artikel-ueber-ki",
+                  title: "Der große KI-Trendreport 2026",
+                },
+              ],
+            },
+          },
+        }),
+      })
+    );
+
+    render(
+      <SourcesPanel
+        notebookId="nb-1"
+        initialSources={[RESEARCH_READY]}
+        selectedSourceId="s-1"
+      />
+    );
+
+    expect(
+      await screen.findByText("Der große KI-Trendreport 2026")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("https://example.com/artikel-ueber-ki")
+    ).toBeInTheDocument();
+  });
+
+  it("fällt bei älteren Recherche-Quellen ohne Titel auf den Link zurück", async () => {
+    const RESEARCH_READY: SourceListItem = {
+      id: "s-1",
+      type: "research",
+      status: "ready",
+      title: "Recherche: KI-Trends",
+      errorMessage: null,
+      originalUrl: null,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          source: {
+            ...RESEARCH_READY,
+            content: "Recherchebericht …",
+            tokenCount: 42,
+            originalUrl: null,
+            blobUrl: null,
+            createdAt: "2026-07-08T10:00:00.000Z",
+            meta: {
+              query: "KI-Trends 2026",
+              citations: ["https://example.com/ohne-titel"],
+            },
+          },
+        }),
+      })
+    );
+
+    render(
+      <SourcesPanel
+        notebookId="nb-1"
+        initialSources={[RESEARCH_READY]}
+        selectedSourceId="s-1"
+      />
+    );
+
+    expect(
+      await screen.findByText("https://example.com/ohne-titel")
+    ).toBeInTheDocument();
+  });
+
   it("meldet eine Quellen-Auswahl an den Workspace", async () => {
     const onSelectSource = vi.fn();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

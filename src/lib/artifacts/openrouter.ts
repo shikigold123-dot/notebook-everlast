@@ -477,10 +477,14 @@ function fallbackInfographic(sources: ChatSource[]) {
 }
 
 function maxTokensFor(type: ArtifactKind, detailLevel?: DetailLevel) {
-  if (type === "infographic" || type === "website") return 3200;
-  if (detailLevel === "detailed") return 4800;
-  if (detailLevel === "brief") return 2000;
-  return 3200;
+  // Infografik-Antworten sind nur kurze JSON-Metadaten (das Bild selbst kommt
+  // über einen separaten Kanal), Website/Landingpage braucht dagegen ein
+  // vollständiges HTML-Dokument mit Inline-CSS und deutlich mehr Spielraum.
+  if (type === "infographic") return 3200;
+  if (type === "website") return 9000;
+  if (detailLevel === "detailed") return 9000;
+  if (detailLevel === "brief") return 3000;
+  return 6000;
 }
 
 export async function generateArtifactContent({

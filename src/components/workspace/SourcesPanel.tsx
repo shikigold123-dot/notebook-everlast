@@ -23,18 +23,32 @@ export type SourceDetailItem = SourceListItem & {
   createdAt: string;
 };
 
-type ResearchMeta = { query?: string; citations?: string[] };
+type ResearchFoundSource = { url: string; title?: string };
+type ResearchMeta = {
+  query?: string;
+  citations?: string[];
+  foundSources?: ResearchFoundSource[];
+};
 
-function readCitations(meta: unknown): string[] {
-  if (
-    meta &&
-    typeof meta === "object" &&
-    "citations" in meta &&
-    Array.isArray((meta as ResearchMeta).citations)
-  ) {
-    return (meta as ResearchMeta).citations as string[];
+function readCitations(meta: unknown): ResearchFoundSource[] {
+  if (!meta || typeof meta !== "object") return [];
+  const record = meta as ResearchMeta;
+
+  if (Array.isArray(record.foundSources)) {
+    return record.foundSources.filter(
+      (source): source is ResearchFoundSource =>
+        Boolean(source) && typeof source.url === "string"
+    );
+  }
+  // Ältere Recherche-Quellen kennen nur die reine URL-Liste (ohne Titel).
+  if (Array.isArray(record.citations)) {
+    return record.citations.map((url) => ({ url }));
   }
   return [];
+}
+
+function citationLabel(citation: ResearchFoundSource) {
+  return citation.title?.trim() || citation.url;
 }
 
 const TYPE_LABELS: Record<SourceListItem["type"], string> = {
@@ -435,10 +449,12 @@ export function SourcesPanel({
                   const citations = readCitations(selectedSource.meta);
                   if (citations.length === 0) return null;
                   const importable = citations.filter(
-                    (url) => !sources.some((s) => s.originalUrl === url)
+                    (citation) => !sources.some((s) => s.originalUrl === citation.url)
                   );
                   if (importable.length === 0) return null;
-                  const anyChecked = importable.some((url) => checkedCitations[url]);
+                  const anyChecked = importable.some(
+                    (citation) => checkedCitations[citation.url]
+                  );
                   return (
                     <div className="mt-4 flex flex-col gap-3 border-t border-line/50 pt-4">
                       <div className="flex items-center justify-between gap-3">
@@ -447,7 +463,9 @@ export function SourcesPanel({
                           type="button"
                           disabled={!anyChecked}
                           onClick={() => {
-                            const urlsToImport = importable.filter((url) => checkedCitations[url]);
+                            const urlsToImport = importable
+                              .filter((citation) => checkedCitations[citation.url])
+                              .map((citation) => citation.url);
                             handleImportSelectedCitations(urlsToImport);
                           }}
                           className="ki-pill ki-interactive cursor-pointer px-2.5 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
@@ -456,7 +474,8 @@ export function SourcesPanel({
                         </button>
                       </div>
                       <div className="flex max-h-60 flex-col gap-2 overflow-y-auto pr-1">
-                        {citations.map((url, idx) => {
+                        {citations.map((citation, idx) => {
+                        const { url } = citation;
                         const isAdded = sources.some((s) => s.originalUrl === url);
                         const isImporting = importingCitations[url];
                         const isChecked = checkedCitations[url] ?? false;
@@ -484,9 +503,17 @@ export function SourcesPanel({
                                 href={url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="truncate text-xs text-ink/90 underline underline-offset-2 hover:text-ink"
+                                className="block min-w-0 flex-1"
+                                title={url}
                               >
-                                {url}
+                                <span className="block truncate text-xs font-semibold text-ink/90 underline underline-offset-2 hover:text-ink">
+                                  {citationLabel(citation)}
+                                </span>
+                                {citation.title && (
+                                  <span className="block truncate text-[10px] text-muted">
+                                    {url}
+                                  </span>
+                                )}
                               </a>
                             </div>
                             {isAdded ? (

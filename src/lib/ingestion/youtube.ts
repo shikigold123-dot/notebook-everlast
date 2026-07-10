@@ -361,11 +361,15 @@ async function ytDlpStreamToAudioFile(
 // von Apples Command Line Tools mitgelieferte Python-3.9-Version, während ein
 // aktuelles Homebrew-Python unversioniert nicht in PATH liegt — deshalb wird
 // hier explizit nach einem passenden Interpreter gesucht, statt uns auf die
-// Shebang-Auflösung zu verlassen.
-let cachedPythonBinary: string | null = null;
+// Shebang-Auflösung zu verlassen. In Serverless-Umgebungen (Vercel, Cloudflare)
+// existiert grundsätzlich kein Python-Interpreter — dort wird der Fallback
+// komplett übersprungen, statt einen zwangsläufig scheiternden Prozess zu
+// spawnen (ein ENOENT beim Spawnen wurde zuvor zu einer Unhandled Rejection,
+// die den gesamten Node-Prozess mit Exit-Code 128 abgeschossen hat).
+let cachedPythonBinary: string | null | undefined;
 
-function resolvePythonBinary(): string {
-  if (cachedPythonBinary) return cachedPythonBinary;
+function resolvePythonBinary(): string | null {
+  if (cachedPythonBinary !== undefined) return cachedPythonBinary;
 
   const candidates = [
     process.env.YTDLP_PYTHON_BIN,
@@ -376,14 +380,21 @@ function resolvePythonBinary(): string {
   ].filter((candidate): candidate is string => Boolean(candidate));
 
   cachedPythonBinary =
-    candidates.find((candidate) => existsSync(candidate)) ?? "python3";
+    candidates.find((candidate) => existsSync(candidate)) ?? null;
   return cachedPythonBinary;
 }
 
 async function downloadWithYtDlp(url: string): Promise<File> {
+  const pythonBinary = resolvePythonBinary();
+  if (!pythonBinary) {
+    throw new Error(
+      "Kein Python-Interpreter verfügbar — yt-dlp-Fallback wird übersprungen."
+    );
+  }
+
   const binaryPath = "node_modules/youtube-dl-exec/bin/yt-dlp";
   const subprocess = spawn(
-    resolvePythonBinary(),
+    pythonBinary,
     [
       binaryPath,
       url,
@@ -397,6 +408,10 @@ async function downloadWithYtDlp(url: string): Promise<File> {
     ],
     { stdio: ["ignore", "pipe", "pipe"], timeout: 120000 }
   );
+  // Verhindert, dass ein Spawn-Fehler (z. B. ENOENT) als "Unhandled 'error'
+  // event" den ganzen Node-Prozess abschießt, bevor die exit-Promise unten
+  // ihren eigenen Listener registrieren kann.
+  subprocess.on("error", () => {});
 
   let stderr = "";
   subprocess.stderr.setEncoding("utf8");
