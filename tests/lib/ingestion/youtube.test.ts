@@ -28,10 +28,12 @@ beforeEach(() => {
   transcribeAudioFileMock.mockReset();
   spawnMock.mockReset();
   existsSyncMock.mockReset().mockReturnValue(true);
+  vi.stubEnv("TRANSCRIPT_API_KEY", "");
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("extractYoutube", () => {
@@ -113,6 +115,59 @@ describe("extractYoutube", () => {
     await expect(
       extractYoutube("https://example.com/nicht-youtube")
     ).rejects.toThrow("Das ist keine gültige YouTube-URL.");
+  });
+
+  it("nutzt transcriptapi.com als primäre Quelle, wenn ein API-Key gesetzt ist", async () => {
+    vi.stubEnv("TRANSCRIPT_API_KEY", "test-api-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        transcript: [
+          { text: "Hallo", start: 0, duration: 1 },
+          { text: "Welt", start: 1, duration: 1 },
+        ],
+        metadata: { title: "Externes Transkript" },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      extractYoutube("https://www.youtube.com/watch?v=abcdefghijk")
+    ).resolves.toMatchObject({
+      title: "Externes Transkript",
+      content: "Hallo Welt",
+      meta: {
+        segments: [
+          { start_s: 0, end_s: 1, text_offset: 0 },
+          { start_s: 1, end_s: 2, text_offset: 6 },
+        ],
+        transcriptSource: "external-api",
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "https://transcriptapi.com/api/v2/youtube/transcript?"
+      ),
+      expect.objectContaining({
+        headers: { Authorization: "Bearer test-api-key" },
+      })
+    );
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it("fällt auf die Innertube-Kette zurück, wenn transcriptapi.com fehlschlägt", async () => {
+    vi.stubEnv("TRANSCRIPT_API_KEY", "test-api-key");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 402 });
+    vi.stubGlobal("fetch", fetchMock);
+    mockTranscript();
+
+    await expect(
+      extractYoutube("https://www.youtube.com/watch?v=abcdefghijk")
+    ).resolves.toMatchObject({
+      title: "Ein Video",
+      content: "Hallo Welt",
+      meta: { transcriptSource: "panel" },
+    });
   });
 
   it("liest Text-Objekte und String-Zeitstempel aus echten Transcript-Segmenten", async () => {

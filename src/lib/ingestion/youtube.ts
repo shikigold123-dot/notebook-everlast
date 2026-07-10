@@ -10,7 +10,11 @@ export type YoutubeExtractionResult = {
   meta: {
     segments: { start_s: number; end_s: number; text_offset: number }[];
     transcriptAvailable?: boolean;
-    transcriptSource?: "panel" | "caption-track" | "audio-transcription";
+    transcriptSource?:
+      | "external-api"
+      | "panel"
+      | "caption-track"
+      | "audio-transcription";
     duration_s?: number;
   };
 };
@@ -439,7 +443,7 @@ async function fetchTranscriptViaAndroidClient(
 function buildResult(
   title: string,
   segments: NormalizedSegment[],
-  source: "panel" | "caption-track"
+  source: "external-api" | "panel" | "caption-track"
 ): YoutubeExtractionResult {
   let content = "";
   const metaSegments: {
@@ -654,12 +658,81 @@ async function transcribeYoutubeAudio(
   }
 }
 
+type TranscriptApiResult = { title: string | null; segments: NormalizedSegment[] };
+
+// Primäre Transkript-Quelle: transcriptapi.com umgeht YouTubes Anti-Bot-Sperre
+// gegen Cloud-/Serverless-IPs (siehe fetchTranscriptViaAndroidClient &
+// fetchCaptionTracksFromWatchPage weiter unten, die auf Vercel beide an dieser
+// Sperre scheitern). Ohne gesetzten TRANSCRIPT_API_KEY wird sie übersprungen
+// und die kostenlose Innertube-Fallback-Kette greift wie zuvor.
+async function fetchTranscriptViaTranscriptApi(
+  videoId: string
+): Promise<TranscriptApiResult | null> {
+  const apiKey = process.env.TRANSCRIPT_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const params = new URLSearchParams({
+      video_url: videoId,
+      format: "json",
+      include_timestamp: "true",
+      send_metadata: "true",
+      language: "de,en",
+    });
+    const res = await fetch(
+      `https://transcriptapi.com/api/v2/youtube/transcript?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (!res.ok) {
+      console.warn(
+        `[youtube] transcriptapi.com lieferte Status ${res.status} für ${videoId}`
+      );
+      return null;
+    }
+
+    const data = (await res.json()) as {
+      transcript?: { text?: unknown; start?: unknown; duration?: unknown }[];
+      metadata?: { title?: string };
+    };
+
+    const segments = (data.transcript ?? [])
+      .map((entry) => {
+        const text = textFromUnknown(entry.text);
+        if (!text.trim()) return null;
+        const startMs = toMs(entry.start) * 1000;
+        const durationMs = toMs(entry.duration) * 1000;
+        return { text, start_ms: startMs, end_ms: startMs + durationMs };
+      })
+      .filter((segment): segment is NormalizedSegment => Boolean(segment));
+
+    if (segments.length === 0) {
+      console.warn(
+        `[youtube] transcriptapi.com lieferte 0 Transkript-Segmente für ${videoId}`
+      );
+      return null;
+    }
+
+    return { title: data.metadata?.title ?? null, segments };
+  } catch (err) {
+    console.warn(
+      `[youtube] transcriptapi.com-Anfrage fehlgeschlagen für ${videoId}:`,
+      err
+    );
+    return null;
+  }
+}
+
 export async function extractYoutube(
   url: string
 ): Promise<YoutubeExtractionResult> {
   const videoId = extractVideoId(url);
   if (!videoId) {
     throw new IngestionError("Das ist keine gültige YouTube-URL.");
+  }
+
+  const apiResult = await fetchTranscriptViaTranscriptApi(videoId);
+  if (apiResult && apiResult.segments.length > 0) {
+    return buildResult(apiResult.title ?? url, apiResult.segments, "external-api");
   }
 
   let info: YoutubeInfo;
