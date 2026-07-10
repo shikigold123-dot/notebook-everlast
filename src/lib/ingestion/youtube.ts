@@ -231,10 +231,16 @@ function parseXmlCaption(text: string): NormalizedSegment[] {
     .filter((segment): segment is NormalizedSegment => Boolean(segment));
 }
 
-async function fetchCaptionTrackSegments(
-  info: YoutubeInfo
-): Promise<NormalizedSegment[]> {
-  const tracks = [...(info.captions?.caption_tracks ?? [])].sort((a, b) => {
+type CaptionTrackRef = {
+  base_url: string;
+  language_code: string;
+  kind?: "asr" | "frc";
+};
+
+function sortCaptionTracks<T extends { language_code: string; kind?: string }>(
+  tracks: T[]
+): T[] {
+  return [...tracks].sort((a, b) => {
     const languageScore = (track: { language_code: string }) => {
       if (track.language_code.startsWith("de")) return 0;
       if (track.language_code.startsWith("en")) return 1;
@@ -243,8 +249,12 @@ async function fetchCaptionTrackSegments(
     const kindScore = (track: { kind?: string }) => (track.kind === "asr" ? 1 : 0);
     return languageScore(a) - languageScore(b) || kindScore(a) - kindScore(b);
   });
+}
 
-  for (const track of tracks) {
+async function fetchSegmentsFromCaptionTracks(
+  tracks: CaptionTrackRef[]
+): Promise<NormalizedSegment[]> {
+  for (const track of sortCaptionTracks(tracks)) {
     try {
       const res = await fetch(captionUrl(track.base_url));
       if (!res.ok) {
@@ -267,6 +277,127 @@ async function fetchCaptionTrackSegments(
         err
       );
     }
+  }
+
+  return [];
+}
+
+async function fetchCaptionTrackSegments(
+  info: YoutubeInfo
+): Promise<NormalizedSegment[]> {
+  return fetchSegmentsFromCaptionTracks(info.captions?.caption_tracks ?? []);
+}
+
+// Extrahiert ein balanciertes {...}-JSON-Objekt ab `startIndex`, ohne bei
+// verschachtelten "};"-Vorkommen in String-Werten fälschlich abzubrechen
+// (ein simples Regex wie /\{.*?\};/ würde dort scheitern).
+function extractBalancedJson(text: string, startIndex: number): string | null {
+  let depth = 0;
+  let inString = false;
+  let stringChar = "";
+  let escaped = false;
+
+  for (let i = startIndex; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === stringChar) inString = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+      continue;
+    }
+    if (ch === "{") depth += 1;
+    else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) return text.slice(startIndex, i + 1);
+    }
+  }
+  return null;
+}
+
+function extractPlayerResponseJson(html: string): unknown {
+  const marker = "ytInitialPlayerResponse = ";
+  const markerIndex = html.indexOf(marker);
+  if (markerIndex === -1) return null;
+
+  const jsonText = extractBalancedJson(html, markerIndex + marker.length);
+  if (!jsonText) return null;
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+}
+
+function captionTracksFromPlayerResponse(
+  playerResponse: unknown
+): CaptionTrackRef[] {
+  if (!playerResponse || typeof playerResponse !== "object") return [];
+  const captions = (playerResponse as Record<string, unknown>).captions;
+  if (!captions || typeof captions !== "object") return [];
+  const renderer = (captions as Record<string, unknown>)
+    .playerCaptionsTracklistRenderer;
+  if (!renderer || typeof renderer !== "object") return [];
+  const tracks = (renderer as Record<string, unknown>).captionTracks;
+  if (!Array.isArray(tracks)) return [];
+
+  return tracks
+    .map((track): CaptionTrackRef | null => {
+      if (!track || typeof track !== "object") return null;
+      const row = track as Record<string, unknown>;
+      const baseUrl = typeof row.baseUrl === "string" ? row.baseUrl : null;
+      if (!baseUrl) return null;
+      return {
+        base_url: baseUrl,
+        language_code:
+          typeof row.languageCode === "string" ? row.languageCode : "und",
+        kind: row.kind === "asr" ? "asr" : undefined,
+      };
+    })
+    .filter((track): track is CaptionTrackRef => Boolean(track));
+}
+
+// Fallback, falls die Innertube-API (getInfo/getTranscript) von dieser
+// Umgebung aus keine Caption-Tracks liefert (z. B. Anti-Bot-Restriktionen
+// gegen Cloud-/Rechenzentrums-IPs auf Vercel/Cloudflare): lädt stattdessen die
+// öffentliche Watch-Page-HTML wie ein Browser und liest die Caption-Tracks aus
+// der eingebetteten ytInitialPlayerResponse-JSON — dieselbe Technik, die u. a.
+// die Python-Bibliothek youtube-transcript-api nutzt.
+async function fetchCaptionTracksFromWatchPage(
+  videoId: string
+): Promise<CaptionTrackRef[]> {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/watch?v=${videoId}&hl=de`,
+      {
+        headers: {
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "accept-language": "de-DE,de;q=0.9,en;q=0.8",
+        },
+      }
+    );
+    if (!res.ok) {
+      console.warn(`[youtube] Watch-Page lieferte HTTP ${res.status}`);
+      return [];
+    }
+    const html = await res.text();
+    const tracks = captionTracksFromPlayerResponse(
+      extractPlayerResponseJson(html)
+    );
+    if (tracks.length === 0) {
+      console.warn(
+        `[youtube] Watch-Page enthielt keine Caption-Tracks für ${videoId}`
+      );
+    }
+    return tracks;
+  } catch (err) {
+    console.warn(`[youtube] Watch-Page-Scrape fehlgeschlagen für ${videoId}:`, err);
+    return [];
   }
 
   return [];
@@ -536,6 +667,14 @@ export async function extractYoutube(
   segments = await fetchCaptionTrackSegments(info);
   if (segments.length > 0) {
     return buildResult(info.basic_info.title ?? url, segments, "caption-track");
+  }
+
+  const watchPageTracks = await fetchCaptionTracksFromWatchPage(videoId);
+  if (watchPageTracks.length > 0) {
+    segments = await fetchSegmentsFromCaptionTracks(watchPageTracks);
+    if (segments.length > 0) {
+      return buildResult(info.basic_info.title ?? url, segments, "caption-track");
+    }
   }
 
   const audioResult = await transcribeYoutubeAudio(info, url);

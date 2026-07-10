@@ -203,6 +203,101 @@ describe("extractYoutube", () => {
     );
   });
 
+  it("liest Caption-Tracks von der Watch-Page, wenn Innertube keine liefert", async () => {
+    const watchPageHtml = `<html><body><script>var ytInitialPlayerResponse = ${JSON.stringify(
+      {
+        captions: {
+          playerCaptionsTracklistRenderer: {
+            captionTracks: [
+              {
+                baseUrl: "https://example.test/scraped-caption?lang=de",
+                languageCode: "de",
+                kind: "asr",
+              },
+            ],
+          },
+        },
+      }
+    )};var other = {};</script></body></html>`;
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/watch?v=")) {
+        return Promise.resolve({ ok: true, text: async () => watchPageHtml });
+      }
+      return Promise.resolve({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            events: [
+              {
+                tStartMs: 0,
+                dDurationMs: 2000,
+                segs: [{ utf8: "Von der Watch-Page" }],
+              },
+            ],
+          }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    createMock.mockResolvedValue({
+      getInfo: vi.fn().mockResolvedValue({
+        basic_info: { title: "Keine Innertube-Captions" },
+        captions: { caption_tracks: [] },
+        getTranscript: vi.fn().mockRejectedValue(new Error("Kein Panel")),
+      }),
+    });
+
+    await expect(
+      extractYoutube("https://www.youtube.com/watch?v=abcdefghijk")
+    ).resolves.toMatchObject({
+      title: "Keine Innertube-Captions",
+      content: "Von der Watch-Page",
+      meta: { transcriptSource: "caption-track" },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://www.youtube.com/watch?v=abcdefghijk&hl=de",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "user-agent": expect.stringContaining("Mozilla"),
+        }),
+      })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.test/scraped-caption?lang=de&fmt=json3"
+    );
+  });
+
+  it("fällt auf Audio-Transkription zurück, wenn auch die Watch-Page keine Captions liefert", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "<html><body>keine player response hier</body></html>",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    transcribeAudioFileMock.mockResolvedValue({
+      content: "Audio-Transkript",
+      meta: { duration_s: 42 },
+    });
+    mockYtDlpAudioProcess();
+
+    createMock.mockResolvedValue({
+      getInfo: vi.fn().mockResolvedValue({
+        basic_info: { title: "Ganz ohne Captions", duration: 60 },
+        captions: { caption_tracks: [] },
+        download: vi.fn().mockRejectedValue(new Error("No valid URL to decipher")),
+        getTranscript: vi.fn().mockRejectedValue(new Error("Kein Panel")),
+      }),
+    });
+
+    await expect(
+      extractYoutube("https://www.youtube.com/watch?v=abcdefghijk")
+    ).resolves.toMatchObject({
+      content: "Audio-Transkript",
+      meta: { transcriptSource: "audio-transcription" },
+    });
+  });
+
   it("transkribiert die YouTube-Audiospur, wenn kein Caption-Track verfügbar ist", async () => {
     transcribeAudioFileMock.mockResolvedValue({
       content: "Transkript aus Audiospur",
