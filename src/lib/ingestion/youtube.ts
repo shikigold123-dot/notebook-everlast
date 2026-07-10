@@ -247,14 +247,25 @@ async function fetchCaptionTrackSegments(
   for (const track of tracks) {
     try {
       const res = await fetch(captionUrl(track.base_url));
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.warn(
+          `[youtube] Caption-Track ${track.language_code} lieferte HTTP ${res.status}`
+        );
+        continue;
+      }
       const text = await res.text();
       const segments = text.trim().startsWith("{")
         ? parseJson3Caption(text)
         : parseXmlCaption(text);
       if (segments.length > 0) return segments;
-    } catch {
-      // Nächsten Caption-Track probieren.
+      console.warn(
+        `[youtube] Caption-Track ${track.language_code} lieferte 0 Segmente`
+      );
+    } catch (err) {
+      console.warn(
+        `[youtube] Caption-Track ${track.language_code} fehlgeschlagen:`,
+        err
+      );
     }
   }
 
@@ -495,7 +506,8 @@ export async function extractYoutube(
     // die dieses Modul tatsächlich konsumiert (Tests mocken die Bibliothek
     // ohnehin vollständig, sodass die echte Laufzeit-Form nie durchläuft).
     info = (await yt.getInfo(videoId)) as unknown as YoutubeInfo;
-  } catch {
+  } catch (err) {
+    console.error(`[youtube] getInfo fehlgeschlagen für ${videoId}:`, err);
     throw new IngestionError(
       "Dieses YouTube-Video konnte nicht geladen werden."
     );
@@ -507,7 +519,8 @@ export async function extractYoutube(
     segments = normalizePanelSegments(
       transcriptInfo.transcript.content?.body?.initial_segments ?? []
     );
-  } catch {
+  } catch (err) {
+    console.error(`[youtube] getTranscript fehlgeschlagen für ${videoId}:`, err);
     segments = [];
   }
 
@@ -515,6 +528,11 @@ export async function extractYoutube(
     return buildResult(info.basic_info.title ?? url, segments, "panel");
   }
 
+  console.warn(
+    `[youtube] kein Transkript-Panel für ${videoId}, ${
+      info.captions?.caption_tracks?.length ?? 0
+    } Caption-Track(s) gefunden`
+  );
   segments = await fetchCaptionTrackSegments(info);
   if (segments.length > 0) {
     return buildResult(info.basic_info.title ?? url, segments, "caption-track");
